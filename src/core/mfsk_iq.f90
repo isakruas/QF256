@@ -10,6 +10,7 @@ module mfsk_iq_mod
   public :: sc_config,sc_result,setup_sc,sc_tx,sc_rx,sc_peak_reference
   public :: mfsk_statistics,estimate_n0,estimate_tone_n0,estimate_snr_2500,mfsk_filtered_waveform
   real(dp),parameter,public :: blind_cfo_limit_hz=750.0_dp
+  real(dp),parameter,public :: blind_hf_cfo_limit_hz=125.0_dp
   type sc_config
     integer :: id=5,nsym=76,ndata=60,npilot=16,n,ns,ntaps,half
     real(dp) :: fs,duration,ts=0.128_dp,spacing=7.8125_dp,lowpass_hz=2000.0_dp
@@ -244,9 +245,10 @@ contains
     score=score/(cfg%fs*cfg%ns)
   end subroutine search_sync
 
-  subroutine acquire(iq,cfg,start,cfo,score)
+  subroutine acquire(iq,cfg,cfo_limit_hz,start,cfo,score)
     complex(dp),intent(in) :: iq(:)
     type(sc_config),intent(in) :: cfg
+    real(dp),intent(in) :: cfo_limit_hz
     integer,intent(out) :: start
     real(dp),intent(out) :: cfo,score
     integer :: coarse_start,refined_start,lo,hi
@@ -259,14 +261,14 @@ contains
     coarse_step=cfg%spacing/2
     middle_step=cfg%spacing/32
     fine_step=cfg%spacing/320
-    call search_sync(iq,cfg,lo,hi,cfg%ns/16,-blind_cfo_limit_hz,blind_cfo_limit_hz, &
+    call search_sync(iq,cfg,lo,hi,cfg%ns/16,-cfo_limit_hz,cfo_limit_hz, &
       coarse_step,coarse_start,coarse_cfo,score)
-    lowfreq=max(-blind_cfo_limit_hz,coarse_cfo-coarse_step)
-    highfreq=min(blind_cfo_limit_hz,coarse_cfo+coarse_step)
+    lowfreq=max(-cfo_limit_hz,coarse_cfo-coarse_step)
+    highfreq=min(cfo_limit_hz,coarse_cfo+coarse_step)
     call search_sync(iq,cfg,max(lo,coarse_start-cfg%ns/16),min(hi,coarse_start+cfg%ns/16), &
       max(1,cfg%ns/96),lowfreq,highfreq,middle_step,refined_start,refined_cfo,score)
-    lowfreq=max(-blind_cfo_limit_hz,refined_cfo-middle_step)
-    highfreq=min(blind_cfo_limit_hz,refined_cfo+middle_step)
+    lowfreq=max(-cfo_limit_hz,refined_cfo-middle_step)
+    highfreq=min(cfo_limit_hz,refined_cfo+middle_step)
     call search_sync(iq,cfg,max(lo,refined_start-cfg%ns/96),min(hi,refined_start+cfg%ns/96), &
       max(1,cfg%ns/384),lowfreq,highfreq,fine_step,start,cfo,score)
   end subroutine acquire
@@ -356,11 +358,13 @@ contains
     call cpu_time(t0);result=sc_result();guard_n0=estimate_n0(iq,cfg%fs)
     allocate(energy(0:255,60),probability(0:255,60))
     if(sync=='blind')then
-      call acquire(iq,cfg,result%start,result%cfo,score)
+      call acquire(iq,cfg,blind_cfo_limit_hz,result%start,result%cfo,score)
+    else if(sync=='blind-hf')then
+      call acquire(iq,cfg,blind_hf_cfo_limit_hz,result%start,result%cfo,score)
     else if(sync=='known')then
       call search_sync(iq,cfg,0,0,1,0.0_dp,0.0_dp,1.0_dp,result%start,result%cfo,score)
     else
-      error stop 'MFSK synchronization must be known or blind'
+      error stop 'MFSK synchronization must be known, blind or blind-hf'
     end if
     call mfsk_statistics(iq,cfg,result%start,result%cfo,energy)
     tone_n0=estimate_tone_n0(energy);n0=guard_n0

@@ -105,6 +105,19 @@ under `study/build/wide-acquisition`. Fixed seeds, the LP1850 mapping, summary
 statistics, and the gate decision are recorded in
 [WIDE-ACQUISITION-VALIDATION.txt](../docs/WIDE-ACQUISITION-VALIDATION.txt).
 
+The additive `blind-hf` profile has a separate LP1200 check for a 300–2,700 Hz
+USB frontend. It alternates the worst decoder-centre offsets (−25 and +25 Hz),
+searches residual CFO from −125 through +125 Hz, and retains the wide
+receiver's evidence gate:
+
+```sh
+make hf-validation
+```
+
+This target performs 4,096 noise-only calls plus 128 signal cases at each of
+−20, −18, and −4 dB. The exact geometry, seeds, results, and interpretation are
+recorded in [HF-ACQUISITION-VALIDATION.txt](../docs/HF-ACQUISITION-VALIDATION.txt).
+
 ## Data identities
 
 [DATA_SOURCES.csv](DATA_SOURCES.csv) and [DATA.sha256](DATA.sha256) identify the

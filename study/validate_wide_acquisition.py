@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Fixed-seed validation of wide QF256 acquisition through an ideal LP frontend.
+"""Fixed-seed validation of QF256 acquisition through an ideal USB frontend.
 
 This is a deliberately manual Monte Carlo harness. It is not part of the
 strict test target: the registered calibration and check comprise 6,144 blind
@@ -26,7 +26,8 @@ SIGNAL_FILTER_SAMPLES = 262144
 SIGNAL_FILTER_PAD = (SIGNAL_FILTER_SAMPLES - SIGNAL_CAPTURE) // 2
 FRAME = 116800
 PAYLOAD_BITS = 77
-SYNC_BLIND = 1
+SYNC_BY_PROFILE = {"wide": 1, "hf": 2}
+CFO_LIMIT_BY_PROFILE = {"wide": 750.0, "hf": 125.0}
 NOISE_LEVELS = (-24.0, -22.0, -20.0, -18.0, -16.0, -14.0)
 
 
@@ -46,8 +47,9 @@ if C.sizeof(Result) != 152:
     raise RuntimeError(f"unexpected qf256_result size: {C.sizeof(Result)}")
 
 
-def init_worker(lib_path, cutoff_hz, capture_samples):
-    global tx, rx, lp_mask, sample_index
+def init_worker(lib_path, cutoff_hz, capture_samples, profile,
+                frontend_offsets):
+    global tx, rx, lp_masks, sample_index, sync_mode, cfo_limit
     lib = C.CDLL(lib_path)
     tx = lib.qf256_tx_cf32
     tx.argtypes = [C.POINTER(C.c_int8), C.POINTER(C.c_float), C.c_int32,
@@ -57,8 +59,17 @@ def init_worker(lib_path, cutoff_hz, capture_samples):
     rx.argtypes = [C.POINTER(C.c_float), C.c_int32, C.c_int32,
                    C.POINTER(Result), C.POINTER(C.c_int32)]
     rx.restype = None
-    lp_mask = np.abs(np.fft.fftfreq(capture_samples, 1 / FS)) <= cutoff_hz
+    frequencies = np.fft.fftfreq(capture_samples, 1 / FS)
+    # The physical USB passband is centred at 1500 Hz.  A decoder centre
+    # displaced by `offset` mixes its complex-baseband bounds to
+    # [-cutoff-offset, +cutoff-offset].
+    lp_masks = {
+        offset: np.abs(frequencies + offset) <= cutoff_hz
+        for offset in frontend_offsets
+    }
     sample_index = np.arange(FRAME)
+    sync_mode = SYNC_BY_PROFILE[profile]
+    cfo_limit = CFO_LIMIT_BY_PROFILE[profile]
 
 
 def call_rx(iq):
@@ -68,40 +79,47 @@ def call_rx(iq):
     result = Result()
     status = C.c_int32(-1)
     rx(interleaved.ctypes.data_as(C.POINTER(C.c_float)), len(iq),
-       SYNC_BLIND, C.byref(result), C.byref(status))
+       sync_mode, C.byref(result), C.byref(status))
     return status.value, result
 
 
-def ideal_lowpass(iq):
-    return np.fft.ifft(np.fft.fft(iq) * lp_mask).astype(np.complex64)
+def ideal_frontend(iq, frontend_offset_hz):
+    return np.fft.ifft(np.fft.fft(iq) *
+                       lp_masks[frontend_offset_hz]).astype(np.complex64)
 
 
 def noise_chunk(spec):
-    first, last, seed_base = spec
+    first, last, seed_base, frontend_offsets = spec
     rows = []
     for index in range(first, last):
         snr_db = NOISE_LEVELS[index % len(NOISE_LEVELS)]
         n0 = 1 / (2500 * 10 ** (snr_db / 10))
         sigma = np.sqrt(FS * n0 / 2)
         seed = seed_base + index
+        frontend_offset = frontend_offsets[index % len(frontend_offsets)]
         rng = np.random.default_rng(seed)
         wide = sigma * (rng.standard_normal(NOISE_CAPTURE) +
                         1j * rng.standard_normal(NOISE_CAPTURE))
-        status, result = call_rx(ideal_lowpass(wide))
+        status, result = call_rx(ideal_frontend(wide, frontend_offset))
         rows.append((index, snr_db, seed, status, int(result.crc_ok),
                      int(result.accepted), result.evidence,
                      result.noise_variance / FS / n0, result.start_samples,
-                     result.cfo_hz, result.iterations, result.latency_ms))
+                     result.cfo_hz, result.iterations, result.latency_ms,
+                     frontend_offset))
     return rows
 
 
 def signal_chunk(spec):
-    snr_db, first, last, seed_base = spec
+    snr_db, first, last, seed_base, frontend_offsets = spec
     rows = []
     n0 = 1 / (2500 * 10 ** (snr_db / 10))
     sigma = np.sqrt(FS * n0 / 2)
-    corners = ((3600, -750.0), (3600, 750.0),
-               (8400, -750.0), (8400, 750.0))
+    corners = tuple(
+        (start, cfo, frontend_offset)
+        for start in (3600, 8400)
+        for cfo in (-cfo_limit, cfo_limit)
+        for frontend_offset in frontend_offsets
+    )
     for index in range(first, last):
         seed = seed_base + index
         rng = np.random.default_rng(seed)
@@ -117,10 +135,11 @@ def signal_chunk(spec):
         wave = wave_iq[0::2].astype(np.complex64)
         wave.imag = wave_iq[1::2]
         if index < len(corners):
-            start, cfo = corners[index]
+            start, cfo, frontend_offset = corners[index]
         else:
             start = int(rng.integers(3600, 8401))
-            cfo = float(rng.uniform(-750.0, 750.0))
+            cfo = float(rng.uniform(-cfo_limit, cfo_limit))
+            frontend_offset = frontend_offsets[index % len(frontend_offsets)]
         initial_phase = float(rng.uniform(-np.pi, np.pi))
         rotation = np.exp(1j * (initial_phase +
                                 2 * np.pi * cfo * sample_index / FS))
@@ -131,7 +150,7 @@ def signal_chunk(spec):
                         1j * rng.standard_normal(SIGNAL_FILTER_SAMPLES))
         first = SIGNAL_FILTER_PAD + start
         wide[first:first + FRAME] += wave * rotation
-        filtered = ideal_lowpass(wide)
+        filtered = ideal_frontend(wide, frontend_offset)
         capture = filtered[SIGNAL_FILTER_PAD:
                            SIGNAL_FILTER_PAD + SIGNAL_CAPTURE]
         status, result = call_rx(capture)
@@ -141,7 +160,7 @@ def signal_chunk(spec):
                      int(np.array_equal(decoded, bits)), int(result.accepted),
                      result.evidence, result.noise_variance / FS / n0,
                      result.start_samples, result.cfo_hz, result.iterations,
-                     result.latency_ms))
+                     result.latency_ms, frontend_offset))
     return rows
 
 
@@ -158,18 +177,22 @@ def collect(pool, worker, specs, total):
 def run_noise(args):
     if Path(args.output).exists():
         raise FileExistsError(f"output already exists: {args.output}")
-    specs = [(first, min(first + args.chunk, args.count), args.seed_base)
+    frontend_offsets = tuple(args.frontend_offset)
+    specs = [(first, min(first + args.chunk, args.count), args.seed_base,
+              frontend_offsets)
              for first in range(0, args.count, args.chunk)]
     started = time.time()
     with mp.get_context("fork").Pool(
             args.workers, initializer=init_worker,
-            initargs=(args.lib, args.cutoff, NOISE_CAPTURE)) as pool:
+            initargs=(args.lib, args.cutoff, NOISE_CAPTURE, args.profile,
+                      frontend_offsets)) as pool:
         rows = collect(pool, noise_chunk, specs, args.count)
     with open(args.output, "x", newline="") as stream:
         writer = csv.writer(stream)
         writer.writerow(("index", "snr_db", "seed", "status", "raw_crc",
                          "api_accepted", "evidence", "n0_ratio",
-                         "start_samples", "cfo_hz", "iterations", "latency_ms"))
+                         "start_samples", "cfo_hz", "iterations", "latency_ms",
+                         "frontend_offset_hz"))
         writer.writerows(rows)
     print(f"DONE {len(rows)} wall_s={time.time() - started:.3f}", flush=True)
 
@@ -178,24 +201,27 @@ def run_signal(args):
     if Path(args.output).exists():
         raise FileExistsError(f"output already exists: {args.output}")
     specs = []
+    frontend_offsets = tuple(args.frontend_offset)
     for level_index, snr_db in enumerate(args.snr):
         level_seed = args.seed_base + level_index * 1_000_000
         for first in range(0, args.count_per_level, args.chunk):
             specs.append((snr_db, first,
                           min(first + args.chunk, args.count_per_level),
-                          level_seed))
+                          level_seed, frontend_offsets))
     total = len(args.snr) * args.count_per_level
     started = time.time()
     with mp.get_context("fork").Pool(
             args.workers, initializer=init_worker,
-            initargs=(args.lib, args.cutoff, SIGNAL_FILTER_SAMPLES)) as pool:
+            initargs=(args.lib, args.cutoff, SIGNAL_FILTER_SAMPLES,
+                      args.profile, frontend_offsets)) as pool:
         rows = collect(pool, signal_chunk, specs, total)
     with open(args.output, "x", newline="") as stream:
         writer = csv.writer(stream)
         writer.writerow(("snr_db", "index", "seed", "true_start", "true_cfo",
                          "initial_phase", "tx_status", "rx_status", "raw_crc",
                          "payload_match", "api_accepted", "evidence", "n0_ratio",
-                         "estimated_start", "estimated_cfo", "iterations", "latency_ms"))
+                         "estimated_start", "estimated_cfo", "iterations", "latency_ms",
+                         "frontend_offset_hz"))
         writer.writerows(rows)
     print(f"DONE {len(rows)} wall_s={time.time() - started:.3f}", flush=True)
 
@@ -281,6 +307,10 @@ def add_run_options(parser, default_workers):
     parser.add_argument("--lib", default="lib/libqf256.so")
     parser.add_argument("--seed-base", type=int, required=True)
     parser.add_argument("--cutoff", type=float, default=1850.0)
+    parser.add_argument("--profile", choices=tuple(SYNC_BY_PROFILE),
+                        default="wide")
+    parser.add_argument("--frontend-offset", type=float, nargs="+",
+                        default=(0.0,))
     parser.add_argument("--workers", type=int, default=default_workers)
     parser.add_argument("--chunk", type=int, default=32)
     parser.add_argument("--output", required=True)

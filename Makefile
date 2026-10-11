@@ -13,7 +13,10 @@ WIDE_VALIDATION_DIR ?= study/build/wide-acquisition
 WIDE_VALIDATION_WORKERS ?= 4
 WIDE_GATE = 30.220758775848424
 WIDE_CUTOFF = 1850
-.PHONY: all clean test test-c-api core-check report strict tools study-analysis snr-validation examples-check wide-validation wide-validation-cal wide-validation-check wide-validation-signals wide-validation-summary
+HF_VALIDATION_DIR ?= study/build/hf-acquisition
+HF_VALIDATION_WORKERS ?= 4
+HF_CUTOFF = 1200
+.PHONY: all clean test test-c-api core-check report strict tools study-analysis snr-validation examples-check wide-validation wide-validation-cal wide-validation-check wide-validation-signals wide-validation-summary hf-validation hf-validation-check hf-validation-signals hf-validation-summary
 all: bin/qf256 bin/qf256-tx bin/qf256-rx lib/libqf256.a lib/libqf256.so
 build/mod bin lib:
 	mkdir -p $@
@@ -76,6 +79,18 @@ wide-validation-summary: wide-validation-cal wide-validation-check wide-validati
 	$(PYTHON) study/validate_wide_acquisition.py summarize-noise --input $(WIDE_VALIDATION_DIR)/noise-check.csv --gate $(WIDE_GATE)
 	$(PYTHON) study/validate_wide_acquisition.py summarize-signal --input $(WIDE_VALIDATION_DIR)/signals.csv --gate $(WIDE_GATE)
 wide-validation: wide-validation-summary
+$(HF_VALIDATION_DIR):
+	mkdir -p $@
+$(HF_VALIDATION_DIR)/noise-check.csv: study/validate_wide_acquisition.py lib/libqf256.so | $(HF_VALIDATION_DIR)
+	OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 $(PYTHON) $< noise --lib lib/libqf256.so --profile hf --count 4096 --seed-base 9096101100 --cutoff $(HF_CUTOFF) --frontend-offset -25 25 --workers $(HF_VALIDATION_WORKERS) --output $@
+$(HF_VALIDATION_DIR)/signals.csv: study/validate_wide_acquisition.py lib/libqf256.so | $(HF_VALIDATION_DIR)
+	OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 $(PYTHON) $< signal --lib lib/libqf256.so --profile hf --count-per-level 128 --snr -20 -18 -4 --seed-base 9097101100 --cutoff $(HF_CUTOFF) --frontend-offset -25 25 --workers $(HF_VALIDATION_WORKERS) --chunk 4 --output $@
+hf-validation-check: $(HF_VALIDATION_DIR)/noise-check.csv
+hf-validation-signals: $(HF_VALIDATION_DIR)/signals.csv
+hf-validation-summary: hf-validation-check hf-validation-signals
+	$(PYTHON) study/validate_wide_acquisition.py summarize-noise --input $(HF_VALIDATION_DIR)/noise-check.csv --gate $(WIDE_GATE)
+	$(PYTHON) study/validate_wide_acquisition.py summarize-signal --input $(HF_VALIDATION_DIR)/signals.csv --gate $(WIDE_GATE)
+hf-validation: hf-validation-summary
 examples-check: all
 	bash tests/check_examples.sh
 core-check:

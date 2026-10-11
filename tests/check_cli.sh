@@ -44,9 +44,10 @@ sha256sum -c tests/fixtures/FIXTURES.sha256 > "$scratch/fixtures.log"
 ./bin/qf256 info > "$scratch/info.json"
 json_object "$scratch/info.json"
 grep -Eq '"payload_bits"[[:space:]]*:[[:space:]]*77' "$scratch/info.json" || fail 'wrong payload size'
-grep -Eq '"version"[[:space:]]*:[[:space:]]*"1\.1\.0"' "$scratch/info.json" || fail 'wrong software version'
+grep -Eq '"version"[[:space:]]*:[[:space:]]*"1\.2\.0"' "$scratch/info.json" || fail 'wrong software version'
 grep -Eq '"api_version"[[:space:]]*:[[:space:]]*1' "$scratch/info.json" || fail 'wrong API version'
 grep -Eq '"blind_cfo_limit_hz"[[:space:]]*:[[:space:]]*7\.50000000000000000E\+002' "$scratch/info.json" || fail 'wrong blind CFO limit'
+grep -Eq '"blind_hf_cfo_limit_hz"[[:space:]]*:[[:space:]]*1\.25000000000000000E\+002' "$scratch/info.json" || fail 'wrong blind-HF CFO limit'
 grep -Eq '"gate"[[:space:]]*:[[:space:]]*3\.02207587758484237E\+001' "$scratch/info.json" || fail 'wrong evidence gate'
 grep -Eq '"snr_estimate_available"[[:space:]]*:[[:space:]]*true' "$scratch/info.json" || fail 'SNR capability missing'
 checks=$((checks+1))
@@ -57,6 +58,9 @@ json_object "$scratch/tx.json"
 [[ $(wc -c < "$scratch/capture.wav") -eq 360044 ]] || fail 'default mono PCM16 capture length'
 ./bin/qf256 rx --iq "$scratch/capture.cf32" > "$scratch/iq_rx.json"
 accepted_decode "$scratch/iq_rx.json"
+./bin/qf256 rx --iq "$scratch/capture.cf32" --sync blind-hf > "$scratch/iq_hf_rx.json"
+accepted_decode "$scratch/iq_hf_rx.json"
+grep -Eq '"sync"[[:space:]]*:[[:space:]]*"blind-hf"' "$scratch/iq_hf_rx.json" || fail 'blind-HF sync not reported'
 ./bin/qf256 rx --wav "$scratch/capture.wav" > "$scratch/wav_rx.json"
 accepted_decode "$scratch/wav_rx.json"
 

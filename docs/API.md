@@ -29,11 +29,12 @@ end if
 `qf256_encode(bits(:), iq, status, message)` accepts exactly 77 default-kind
 integers in `{0,1}` and allocates its `complex(real64)` output. On a validation
 error `iq` is unallocated. `qf256_decode(iq(:), sync, result, accepted, status,
-message)` accepts `known` or `blind`. Both routines have an optional output
+message)` accepts `known`, `blind`, or `blind-hf`. Both routines have an optional output
 character argument `message`; a short caller buffer truncates it normally.
 Constants exported by the module include `qf256_sample_rate`,
 `qf256_frame_samples`, `qf256_payload_bits`, `qf256_blind_min_samples`,
 `qf256_max_samples`, `qf256_gate`, `qf256_blind_cfo_limit_hz`,
+`qf256_blind_hf_cfo_limit_hz`,
 `qf256_snr_reference_hz`, synchronization values and status codes.
 
 `sc_result` is re-exported from the core. Its payload and `crc_ok` describe the
@@ -52,8 +53,9 @@ estimate defined below.
 |---|---:|---|
 | `known` / `QF256_SYNC_KNOWN` | 116800 | Frame starts at offset zero; residual CFO is assumed zero. |
 | `blind` / `QF256_SYNC_BLIND` | 125200 | Search frame starts from 0.3 through 0.7 seconds and complex-baseband CFO from −750 through +750 Hz. |
+| `blind-hf` / `QF256_SYNC_BLIND_HF` | 125200 | Same timing search, with complex-baseband CFO from −125 through +125 Hz for a conventional USB channel. |
 
-The maximum length is 180000 complex samples (15 seconds) in either mode.
+The maximum length is 180000 complex samples (15 seconds) in every mode.
 The blind minimum accommodates the whole filtered frame at the latest searched
 start. Provide one capture window per call. Surrounding samples within the
 accepted length contribute to the guard-band noise estimate; the selected N0
@@ -76,6 +78,10 @@ void qf256_tx_cf32(const int8_t payload77[77], float *iq_interleaved,
 void qf256_rx_cf32(const float *iq_interleaved, int32_t ncomplex,
                    int32_t sync_mode, qf256_result *result, int32_t *status);
 ```
+
+`QF256_SYNC_BLIND_HF == 2` is additive; the function signatures, API version 1,
+and 152-byte result layout are unchanged. Existing callers using
+`QF256_SYNC_BLIND == 1` retain the full ±750 Hz search.
 
 IQ is float32 interleaved `[I0,Q0,I1,Q1,...]`. Counts are complex samples, passed
 by value. Allocate at least `2*capacity_complex` floats for TX and `2*ncomplex`
@@ -193,11 +199,20 @@ WAV analytic conversion keeps the positive-frequency audio spectrum before
 translation, so it does not supply the same guards as full-band complex IQ.
 The fallback makes such filtered input decodable, but its selected noise, SNR,
 and evidence can still differ from the corresponding full-band IQ capture.
-The ±750 Hz acquisition interval is an IQ contract. Because QF256 tones extend
+The ±750 Hz acquisition interval of `blind` is an IQ contract. Because QF256 tones extend
 to ±996.09375 Hz, a real 0..6000 Hz WAV path needs a center approximately in
 the range 1746.09375..4253.90625 Hz for full ±750 Hz coverage, plus a frontend
 passband that actually retains those frequencies. The 1500 Hz default covers
 the nominal zero-CFO waveform but not the complete negative-CFO limit.
+
+`blind-hf` is the bounded real-audio profile. With a physical USB passband of
+300–2,700 Hz, an audio centre from 1,475 through 1,525 Hz, and residual CFO no
+larger than ±125 Hz, the outer tone centres occupy 353.90625–2,646.09375 Hz.
+That leaves 53.90625 Hz to each limiting passband edge in the worst Cartesian
+corner. This numerical contract assumes the frontend retains those tone
+centres; real transition-band attenuation remains a system-level check. The
+guard bands are absent in this frontend, so the decoder normally selects its
+in-band tone N0 estimate.
 
 RX JSON reports `accepted`, `crc_ok`, `payload77`, `payload_hex`, `start_sample`,
 `start_s`, `cfo_hz`, `noise_variance`, `estimated_n0`, `evidence`, `gate`,

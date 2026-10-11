@@ -3,7 +3,7 @@ module qf256_cli
   use iso_fortran_env,only:real64
   use, intrinsic::ieee_arithmetic,only:ieee_is_finite
   use qf256_api,only:qf256_encode,qf256_decode,sc_result,qf256_sample_rate,qf256_frame_samples,qf256_gate, &
-    qf256_blind_cfo_limit_hz
+    qf256_blind_cfo_limit_hz,qf256_blind_hf_cfo_limit_hz
   use qf256_io_mod,only:write_iq,read_iq,write_wav,read_wav
   implicit none
   private
@@ -32,9 +32,10 @@ contains
     end if
     if(action=='--version'.or.action=='info')then
       if(argc>=i)call usage_error('info takes no options')
-      print '(A)','{"modem":"QF256","version":"1.1.0","api_version":1,"sample_rate_hz":12000,"payload_bits":77,'// &
+      print '(A)','{"modem":"QF256","version":"1.2.0","api_version":1,"sample_rate_hz":12000,"payload_bits":77,'// &
         '"frame_samples":116800,"frame_seconds":9.733333333333333,"capture_samples":180000,'// &
         '"gate":'//real_text(qf256_gate)//',"blind_cfo_limit_hz":'//real_text(qf256_blind_cfo_limit_hz)// &
+        ',"blind_hf_cfo_limit_hz":'//real_text(qf256_blind_hf_cfo_limit_hz)// &
         ',"snr_estimate_available":true,"snr_reference_bandwidth_hz":2500}'
       return
     end if
@@ -84,7 +85,7 @@ contains
     end do
     if(.not.ieee_is_finite(center).or.center<1100.or.center>4500)call usage_error('Center must be 1100..4500 Hz')
     if(.not.ieee_is_finite(start_s))call usage_error('Start must be finite')
-    if(sync/='blind'.and.sync/='known')call usage_error('Sync must be blind or known')
+    if(sync/='blind'.and.sync/='blind-hf'.and.sync/='known')call usage_error('Sync must be blind, blind-hf or known')
     if(len_trim(iq_path)==0.and.len_trim(wav_path)==0)call usage_error('Specify --iq or --wav')
     if(center_set.and.len_trim(wav_path)==0)call usage_error('--center-hz applies only to WAV')
     if(action=='tx')then
@@ -188,13 +189,14 @@ contains
     stop 2
   end subroutine usage_error
   subroutine help()
-    print '(A)','QF256 1.1.0 - 77-bit modem, 12000 complex samples/s'
+    print '(A)','QF256 1.2.0 - 77-bit modem, 12000 complex samples/s'
     print '(A)','qf256 tx (--bits BITS77 | --hex HEX20) [--iq OUT.cf32] [--wav OUT.wav]'
     print '(A)','           [--center-hz 1500] [--frame-only | --start-seconds 0.5]'
-    print '(A)','qf256 rx (--iq IN.cf32 | --wav IN.wav) [--center-hz 1500] [--sync blind|known]'
+    print '(A)','qf256 rx (--iq IN.cf32 | --wav IN.wav) [--center-hz 1500] [--sync blind|blind-hf|known]'
     print '(A)','Use spaces between options and values. Default TX: 15 s capture, burst at 0.5 s.'
     print '(A)','Frame-only TX: 9.733333 s; decode with --sync known (start 0, CFO 0).'
     print '(A)','Blind IQ RX searches start 0.3..0.7 s and residual CFO -750..+750 Hz.'
+    print '(A)','Blind-HF RX uses the same timing search and residual CFO -125..+125 Hz.'
     print '(A)','IQ: headerless float32 little-endian I,Q. WAV: PCM16LE mono 12000 Hz.'
     print '(A)','RX snr_db is an accepted-frame estimate in 2500 Hz; Doppler spread is unavailable.'
     print '(A)','Output: one JSON object; exit 0=success, 1=no accepted decode, 2=invalid input/I/O.'

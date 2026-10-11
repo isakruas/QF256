@@ -4,7 +4,7 @@ module qf256_api
   use iso_fortran_env, only: real64
   use iso_c_binding, only: c_ptr,c_associated,c_f_pointer,c_int8_t,c_int32_t,c_float,c_double
   use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
-  use mfsk_iq_mod, only: sc_config,sc_result,setup_sc,sc_tx,sc_rx,blind_cfo_limit_hz
+  use mfsk_iq_mod, only: sc_config,sc_result,setup_sc,sc_tx,sc_rx,blind_cfo_limit_hz,blind_hf_cfo_limit_hz
   implicit none
   private
   integer,parameter,public :: qf256_api_version=1
@@ -13,10 +13,11 @@ module qf256_api
   real(real64),parameter,public :: qf256_gate=30.220758775848424_real64
   real(real64),parameter,public :: qf256_snr_reference_hz=2500.0_real64
   real(real64),parameter,public :: qf256_blind_cfo_limit_hz=blind_cfo_limit_hz
+  real(real64),parameter,public :: qf256_blind_hf_cfo_limit_hz=blind_hf_cfo_limit_hz
   integer,parameter,public :: qf256_ok=0,qf256_invalid_bits=1,qf256_invalid_sync=2
   integer,parameter,public :: qf256_invalid_length=3,qf256_nonfinite=4,qf256_buffer_too_small=5
   integer,parameter,public :: qf256_invalid_argument=6,qf256_numeric_range=7
-  integer,parameter,public :: qf256_sync_known=0,qf256_sync_blind=1
+  integer,parameter,public :: qf256_sync_known=0,qf256_sync_blind=1,qf256_sync_blind_hf=2
   public :: qf256_encode,qf256_decode,sc_result,qf256_result_c
   public :: qf256_tx_cf32,qf256_rx_cf32
 
@@ -74,9 +75,9 @@ contains
     result=sc_result();accepted=.false.
     select case(trim(sync))
     case('known');minimum=qf256_frame_samples
-    case('blind');minimum=qf256_blind_min_samples
+    case('blind','blind-hf');minimum=qf256_blind_min_samples
     case default
-      call report_status(status,message,qf256_invalid_sync,'Synchronization must be known or blind')
+      call report_status(status,message,qf256_invalid_sync,'Synchronization must be known, blind or blind-hf')
       return
     end select
     if(size(iq)<minimum.or.size(iq)>qf256_max_samples)then
@@ -164,7 +165,7 @@ contains
     type(qf256_result_c),pointer :: output
     complex(real64),allocatable :: iq(:)
     type(sc_result) :: result
-    character(5) :: sync
+    character(8) :: sync
     integer :: minimum,local_status,i
     logical :: accepted
     if(.not.c_associated(status_ptr))return
@@ -175,6 +176,7 @@ contains
     select case(sync_mode)
     case(qf256_sync_known);sync='known';minimum=qf256_frame_samples
     case(qf256_sync_blind);sync='blind';minimum=qf256_blind_min_samples
+    case(qf256_sync_blind_hf);sync='blind-hf';minimum=qf256_blind_min_samples
     case default
       status=qf256_invalid_sync
       return

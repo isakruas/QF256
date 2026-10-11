@@ -1,10 +1,11 @@
-QF256 1.1.0 - 77-bit modem, 12000 complex samples/s
+QF256 1.2.0 - 77-bit modem, 12000 complex samples/s
 qf256 tx (--bits BITS77 | --hex HEX20) [--iq OUT.cf32] [--wav OUT.wav]
            [--center-hz 1500] [--frame-only | --start-seconds 0.5]
-qf256 rx (--iq IN.cf32 | --wav IN.wav) [--center-hz 1500] [--sync blind|known]
+qf256 rx (--iq IN.cf32 | --wav IN.wav) [--center-hz 1500] [--sync blind|blind-hf|known]
 Use spaces between options and values. Default TX: 15 s capture, burst at 0.5 s.
 Frame-only TX: 9.733333 s; decode with --sync known (start 0, CFO 0).
 Blind IQ RX searches start 0.3..0.7 s and residual CFO -750..+750 Hz.
+Blind-HF RX uses the same timing search and residual CFO -125..+125 Hz.
 IQ: headerless float32 little-endian I,Q. WAV: PCM16LE mono 12000 Hz.
 RX snr_db is an accepted-frame estimate in 2500 Hz; Doppler spread is unavailable.
 Output: one JSON object; exit 0=success, 1=no accepted decode, 2=invalid input/I/O.

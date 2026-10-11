@@ -51,13 +51,14 @@ Supply one capture window per RX call:
 |---|---:|---|
 | `known` | 116,800 | Frame starts at sample zero; CFO is zero. |
 | `blind` (default) | 125,200 | Searches starts from 0.3 to 0.7 s and complex-baseband CFO from −750 to +750 Hz. |
+| `blind-hf` | 125,200 | Uses the same timing search and a conventional-HF CFO range from −125 to +125 Hz. |
 
 The maximum is 180,000 samples (15 s) in either mode. Larger files are rejected before capture allocation or FFT processing. Reported sample offsets are zero-based.
 
 ## Files and results
 
 - **IQ:** headerless IEEE 754 little-endian `float32`, interleaved `I0,Q0,I1,Q1,…`, at 12,000 pairs/s and centered at zero. Active-frame average complex power is 1. A full capture contains 180,000 pairs; `--frame-only` produces 116,800 pairs.
-- **WAV:** RIFF PCM16 little-endian, mono, 12,000 Hz, with playback peak near −3 dBFS. The default center is 1,500 Hz, placing the zero-CFO tones at approximately 504–2,496 Hz. `--center-hz` accepts 1,100–4,500 Hz; use the same center at RX. The ±750 Hz contract applies to complex IQ; a real-audio frontend needs a center of at least approximately 1,747 Hz and enough passband to retain the shifted tones. WAV conversion and noise handling are described in [docs/API.md](docs/API.md#file-interfaces-and-noise-fields).
+- **WAV:** RIFF PCM16 little-endian, mono, 12,000 Hz, with playback peak near −3 dBFS. The default center is 1,500 Hz, placing the zero-CFO tones at approximately 504–2,496 Hz. `--center-hz` accepts 1,100–4,500 Hz; use the same center at RX. The wide ±750 Hz contract applies to complex IQ and requires a correspondingly wide audio passband. The `blind-hf` profile is the validated choice for a 300–2,700 Hz USB frontend with centres 1,475–1,525 Hz. WAV conversion and noise handling are described in [docs/API.md](docs/API.md#file-interfaces-and-noise-fields).
 - **RX:** one JSON line with acceptance, raw CRC status, payload, start offset, CFO, selected noise estimate, SNR, evidence, gate, iteration count, and CPU time. `payload77`, `payload_hex`, and the 2500 Hz-referenced `snr_db` are populated for an accepted decode; they are `null` otherwise. `doppler_spread_hz` remains unavailable and is always `null`.
 - **Exit status:** 0 for success, 1 for a valid capture without an accepted message, and 2 for an invalid argument or file. Errors produce JSON on standard output; the runtime may also print a stop code on standard error. `--help` produces text; `info` produces JSON.
 
@@ -72,6 +73,11 @@ The sample rate, payload size, waveform, and acceptance gate are fixed. Each RX 
 ## Technical report and current validation
 
 The [wide-acquisition validation](docs/WIDE-ACQUISITION-VALIDATION.txt) records the fixed-seed tests for the current receiver: the ±750 Hz search, recalibrated evidence gate, filtered-audio noise fallback, and boundary-CFO regressions.
+
+The additive [HF acquisition validation](docs/HF-ACQUISITION-VALIDATION.txt)
+records the fixed-seed LP1200 tests for `blind-hf`: ±125 Hz CFO, the two
+worst-case 1,475/1,525 Hz centres, and the unchanged evidence gate. The wide
+`blind` mode and its ±750 Hz contract remain available.
 
 The [PDF report](docs/report/qf256-report.pdf), its [LaTeX source](docs/report/qf256-report.tex), and the bundled HF study are preserved v1.0 evidence. They describe the earlier ±10 Hz blind search, guard-only N0 estimator, and old gate; they are not presented as validation of the expanded receiver.
 

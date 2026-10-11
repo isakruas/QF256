@@ -4,7 +4,7 @@ program test_core
   use numerics_mod, only: dp,PI,seed_rng,rng_normal
   use qra_soft_mod, only: qra_encode,qra_decode,qra_syndrome
   use mfsk_iq_mod, only: sc_config,sc_result,setup_sc,sc_tx,sc_rx,sc_peak_reference,mfsk_statistics, &
-    estimate_n0,blind_cfo_limit_hz
+    estimate_n0,blind_cfo_limit_hz,blind_hf_cfo_limit_hz
   use v2metrics_mod, only: waveform_metrics
   implicit none
   type(sc_config) :: cfg
@@ -19,6 +19,7 @@ program test_core
     40.625_dp,160.25_dp,748.046875_dp,750.0_dp]
   integer,parameter :: boundary_starts(4)=[3600,3600,8400,8400]
   real(dp),parameter :: boundary_cfos(4)=[-750.0_dp,750.0_dp,-750.0_dp,750.0_dp]
+  real(dp),parameter :: hf_boundary_cfos(4)=[-125.0_dp,125.0_dp,-125.0_dp,125.0_dp]
   real(real32), allocatable :: packed(:,:)
   complex(dp), allocatable :: iq(:),capture(:),minimum_capture(:),noise(:),wide_noise(:),filtered_noise(:)
   logical :: ok
@@ -30,6 +31,7 @@ program test_core
   call setup_sc(5,10.0_dp,12000.0_dp,cfg)
   call check(cfg%n==116800.and.cfg%ns==1536,'frame sample and symbol lengths')
   call check(blind_cfo_limit_hz==750.0_dp,'fixed blind CFO acquisition limit')
+  call check(blind_hf_cfo_limit_hz==125.0_dp,'fixed blind-HF CFO acquisition limit')
   call check(cfg%ndata==60.and.cfg%npilot==16.and.cfg%nsym==76,'data and pilot schedule')
   call check(abs(cfg%duration-9.733333333333333_dp)<1e-12_dp,'full filtered duration')
   call check(all(cfg%pilot_tone==[116,189,210,195,96,57,158,159,12,117,42,59,120,113,118,151]),'fixed public pilot tones')
@@ -160,6 +162,21 @@ program test_core
     call check(result%start==offset,'exact timing search corner is included')
     call check(abs(result%cfo-cfo)<1.0e-12_dp,'exact CFO search corner is included')
     call check(result%evidence>=30.22075_dp,'exact search-corner frame passes public evidence gate')
+  end do
+  ! The additive HF profile uses the same timing window and decoder but a
+  ! narrower frequency grid that fits a conventional 300..2700 Hz USB channel.
+  ! Both frequency endpoints are exact coarse-grid points: 250/3.90625=64.
+  do trial=1,size(boundary_starts)
+    call random_payload(payload);call sc_tx(payload,cfg,iq)
+    offset=boundary_starts(trial);cfo=hf_boundary_cfos(trial);phase=.31_dp*trial;minimum_capture=0
+    do i=1,size(iq)
+      minimum_capture(offset+i)=iq(i)*exp(cmplx(0.0_dp,phase+2*PI*cfo*(i-1)/cfg%fs,dp))
+    end do
+    call sc_rx(minimum_capture,cfg,'blind-hf',result)
+    call check(result%crc_ok.and.all(result%payload==payload),'blind-HF decode at exact timing/CFO search corner')
+    call check(result%start==offset,'blind-HF exact timing search corner is included')
+    call check(abs(result%cfo-cfo)<1.0e-12_dp,'blind-HF exact CFO search corner is included')
+    call check(result%evidence>=30.22075_dp,'blind-HF search-corner frame passes public evidence gate')
   end do
   ! A real receiver can preserve the modem tones while suppressing the old
   ! out-of-band noise guards.  The decoder must then use its robust in-band
