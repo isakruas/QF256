@@ -4,14 +4,15 @@ module qf256_api
   use iso_fortran_env, only: real64
   use iso_c_binding, only: c_ptr,c_associated,c_f_pointer,c_int8_t,c_int32_t,c_float,c_double
   use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
-  use mfsk_iq_mod, only: sc_config,sc_result,setup_sc,sc_tx,sc_rx
+  use mfsk_iq_mod, only: sc_config,sc_result,setup_sc,sc_tx,sc_rx,blind_cfo_limit_hz
   implicit none
   private
   integer,parameter,public :: qf256_api_version=1
   integer,parameter,public :: qf256_sample_rate=12000,qf256_frame_samples=116800
   integer,parameter,public :: qf256_payload_bits=77,qf256_blind_min_samples=125200,qf256_max_samples=180000
-  real(real64),parameter,public :: qf256_gate=22.644583913858970_real64
+  real(real64),parameter,public :: qf256_gate=30.220758775848424_real64
   real(real64),parameter,public :: qf256_snr_reference_hz=2500.0_real64
+  real(real64),parameter,public :: qf256_blind_cfo_limit_hz=blind_cfo_limit_hz
   integer,parameter,public :: qf256_ok=0,qf256_invalid_bits=1,qf256_invalid_sync=2
   integer,parameter,public :: qf256_invalid_length=3,qf256_nonfinite=4,qf256_buffer_too_small=5
   integer,parameter,public :: qf256_invalid_argument=6,qf256_numeric_range=7

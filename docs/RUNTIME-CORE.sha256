@@ -1,0 +1,5 @@
+# Current-runtime source manifest.
+5ba00fb86684601d91d81162b0ecc94eb6e238441bbb80500d9612b3d927d04d  src/core/mfsk_iq.f90
+19b3121a72fefae738d84b8c28e36e1eacff3b02dc82bea9cef36cde9b1029c6  src/core/numerics.f90
+9dc334170e4fd82fb999289d63e7961d1668ca2df8b1b86847b46efbc8236f58  src/core/qra_soft.f90
+e338e09a6894e5f340cb3c1891d2357e7afa4437f0d11ecd23eb156837d6bb50  src/core/waveform_metrics.f90

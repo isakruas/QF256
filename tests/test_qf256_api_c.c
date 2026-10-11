@@ -9,6 +9,7 @@
 
 _Static_assert(sizeof(qf256_result) == 152, "Unexpected ABI result size");
 _Static_assert(QF256_API_VERSION == 1, "Unexpected API version");
+_Static_assert(QF256_BLIND_CFO_LIMIT_HZ == 750.0, "Unexpected blind CFO limit");
 _Static_assert(offsetof(qf256_result, start_seconds) == 96, "Unexpected ABI result alignment");
 _Static_assert(offsetof(qf256_result, snr_2500_db) == 136, "Unexpected ABI SNR alignment");
 _Static_assert(offsetof(qf256_result, snr_valid) == 144, "Unexpected ABI validity alignment");
@@ -43,7 +44,7 @@ int main(void) {
     assert(result.reserved2 == 0);
 
     const int offset = 6000;
-    const double cfo = 1.375;
+    const double cfo = 720.375;
     for (int i=0; i<QF256_FRAME_SAMPLES; ++i) {
         double phase = 0.73 + 2.0*acos(-1.0)*cfo*i/QF256_SAMPLE_RATE;
         double re = wave[2*i], im = wave[2*i+1];

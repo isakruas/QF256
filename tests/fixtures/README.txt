@@ -21,8 +21,9 @@ It has 116800 PCM samples and 233644 bytes.
 SHA256: 1f062c0f0605c41fca79034bb68cfe062bdedad8204326faf233e239cf2cd0aa
 
 test_core reconstructs and compares every reference PCM sample exactly.
-The audio fixture is the original reference export. Current core source
-identities are recorded in docs/CORE.sha256.
+The audio fixture is the original v1.0 reference export; its frozen core
+source identities are recorded in docs/CORE.sha256. Current runtime source
+identities are recorded separately in docs/RUNTIME-CORE.sha256.
 
 Reference platform: little-endian Linux, GNU Fortran 14.2, -O3 without fast-math.
 Exact hashes depend on the recorded toolchain and floating-point behavior.

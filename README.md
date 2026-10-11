@@ -50,18 +50,18 @@ Supply one capture window per RX call:
 | Synchronization | Minimum samples | Start and carrier frequency offset (CFO) |
 |---|---:|---|
 | `known` | 116,800 | Frame starts at sample zero; CFO is zero. |
-| `blind` (default) | 125,200 | Searches starts from 0.3 to 0.7 s and CFO from −10 to +10 Hz. |
+| `blind` (default) | 125,200 | Searches starts from 0.3 to 0.7 s and complex-baseband CFO from −750 to +750 Hz. |
 
 The maximum is 180,000 samples (15 s) in either mode. Larger files are rejected before capture allocation or FFT processing. Reported sample offsets are zero-based.
 
 ## Files and results
 
 - **IQ:** headerless IEEE 754 little-endian `float32`, interleaved `I0,Q0,I1,Q1,…`, at 12,000 pairs/s and centered at zero. Active-frame average complex power is 1. A full capture contains 180,000 pairs; `--frame-only` produces 116,800 pairs.
-- **WAV:** RIFF PCM16 little-endian, mono, 12,000 Hz, with playback peak near −3 dBFS. The default center is 1,500 Hz, placing the tones at approximately 504–2,496 Hz. `--center-hz` accepts 1,100–4,500 Hz; use the same center at RX. WAV conversion and noise-band handling are described in [docs/API.md](docs/API.md#file-interfaces-and-noise-fields).
-- **RX:** one JSON line with acceptance, raw CRC status, payload, start offset, CFO, noise estimates, SNR, evidence, gate, iteration count, and CPU time. `payload77`, `payload_hex`, and the 2500 Hz-referenced `snr_db` are populated for an accepted decode; they are `null` otherwise. `doppler_spread_hz` remains unavailable and is always `null`.
+- **WAV:** RIFF PCM16 little-endian, mono, 12,000 Hz, with playback peak near −3 dBFS. The default center is 1,500 Hz, placing the zero-CFO tones at approximately 504–2,496 Hz. `--center-hz` accepts 1,100–4,500 Hz; use the same center at RX. The ±750 Hz contract applies to complex IQ; a real-audio frontend needs a center of at least approximately 1,747 Hz and enough passband to retain the shifted tones. WAV conversion and noise handling are described in [docs/API.md](docs/API.md#file-interfaces-and-noise-fields).
+- **RX:** one JSON line with acceptance, raw CRC status, payload, start offset, CFO, selected noise estimate, SNR, evidence, gate, iteration count, and CPU time. `payload77`, `payload_hex`, and the 2500 Hz-referenced `snr_db` are populated for an accepted decode; they are `null` otherwise. `doppler_spread_hz` remains unavailable and is always `null`.
 - **Exit status:** 0 for success, 1 for a valid capture without an accepted message, and 2 for an invalid argument or file. Errors produce JSON on standard output; the runtime may also print a stop code on standard error. `--help` produces text; `info` produces JSON.
 
-Acceptance requires valid CRC/FEC **and** `evidence >= 22.644583913858970`. Evidence is pilot energy divided by estimated N0, minus 16. Field definitions are in the [API reference](docs/API.md).
+Acceptance requires valid CRC/FEC **and** `evidence >= 30.220758775848424`. Evidence is pilot energy divided by the selected N0 estimate, minus 16. Field definitions are in the [API reference](docs/API.md).
 
 ## Integration
 
@@ -69,19 +69,20 @@ See [docs/API.md](docs/API.md) for the Fortran API, C ABI, memory requirements, 
 
 The sample rate, payload size, waveform, and acceptance gate are fixed. Each RX call returns at most one message. Calls share an FFT cache and must be serialized within a process; separate processes can run concurrently.
 
-## Technical report
+## Technical report and current validation
 
-The report contains the mathematical specification and completed HF performance study, with cell-level confidence intervals, noise-only acceptance bounds, waveform measurements, and figures. It is available as [PDF](docs/report/qf256-report.pdf) and [LaTeX source](docs/report/qf256-report.tex).
+The [wide-acquisition validation](docs/WIDE-ACQUISITION-VALIDATION.txt) records the fixed-seed tests for the current receiver: the ±750 Hz search, recalibrated evidence gate, filtered-audio noise fallback, and boundary-CFO regressions.
 
-The [study directory](study/README.md) contains the individual records, Fortran analysis, channel model, indexed reproduction harness, and GNUplot sources. Regenerate the numerical results and figures, then rebuild the article with pdfLaTeX:
+The [PDF report](docs/report/qf256-report.pdf), its [LaTeX source](docs/report/qf256-report.tex), and the bundled HF study are preserved v1.0 evidence. They describe the earlier ±10 Hz blind search, guard-only N0 estimator, and old gate; they are not presented as validation of the expanded receiver.
+
+The [study directory](study/README.md) contains the individual records, Fortran analysis, channel model, indexed reproduction harness, and GNUplot sources. Analyze the preserved records and rebuild the article with pdfLaTeX:
 
 ```sh
 make study-analysis
-make snr-validation
 make report
 ```
 
-`study-analysis` analyzes the included measurements. `snr-validation` runs the fixed-seed AWGN and HF-channel checks for the receiver's SNR estimator. Report dependencies are listed in [docs/report/README.txt](docs/report/README.txt).
+`study-analysis` analyzes the included historical measurements. Reproducing those trials or `make snr-validation` exactly requires the v1.0.0 source identified by the historical manifests; compiling either harness against the current core is a new experiment. Report dependencies are listed in [docs/report/README.txt](docs/report/README.txt).
 
 ## Tests and license
 

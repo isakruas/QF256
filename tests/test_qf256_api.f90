@@ -9,7 +9,9 @@ program test_qf256_api
   type(sc_result) :: result
   logical :: accepted
   character(160) :: message
-  if(qf256_api_version/=1.or.qf256_snr_reference_hz/=2500.0_real64)error stop 'Unexpected public API constants'
+  if(qf256_api_version/=1.or.qf256_snr_reference_hz/=2500.0_real64.or. &
+    qf256_blind_cfo_limit_hz/=750.0_real64.or.qf256_gate/=30.220758775848424_real64) &
+    error stop 'Unexpected public API constants'
   do i=1,77
     bits(i)=modulo(i*17+i/3,2)
   end do

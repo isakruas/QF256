@@ -1,5 +1,13 @@
 # QF256 completed-record study
 
+> **Historical v1.0 evidence.** The bundled measurements, expected replay
+> values, and SNR-validation output belong to QF256 v1.0.0. Exact trial replay
+> requires tag `v1.0.0`, commit
+> `93405683da7fc6c1e5f886e4ccca30850c7d3875`. On the current HEAD, the record
+> analysis below still analyzes the stored CSV files, but compiling and running
+> the replay or SNR harness uses the current receiver and constitutes a new
+> experiment; it is not expected to match the frozen v1.0 outputs.
+
 This directory contains the QF256 confirmation and noise records, physical
 waveform measurements, Fortran analysis, and a one-trial reproduction harness.
 All commands below run from the project root.
@@ -39,6 +47,7 @@ dependency is available in the `gnuplot-nox` package.
 | [MODEL.md](MODEL.md) | Channel, power/SNR, source sampling, seeds, acquisition and gate configuration |
 | [PHYSICAL.md](PHYSICAL.md) | Waveform definition, physical measurement conventions and table descriptions |
 | [validate_snr.f90](validate_snr.f90), [SNR_VALIDATION.csv](SNR_VALIDATION.csv) | Fixed-seed AWGN and HF-channel validation of the receiver SNR estimator |
+| [validate_wide_acquisition.py](validate_wide_acquisition.py) | Manual fixed-seed LP1850 calibration/check and boundary-signal harness for the current wide receiver |
 | [physical/summary.csv](physical/summary.csv) | Bandwidth, PAPR, power and energy statistics |
 | [physical/bw99_cdf.csv](physical/bw99_cdf.csv), [physical/papr_cdf.csv](physical/papr_cdf.csv) | Empirical distributions for 1,536 distinct source cases |
 
@@ -48,6 +57,10 @@ within the 77-bit modem input. Reference SNR uses unit transmitted power in a
 power is lower; the records retain its actual average SNR and energy.
 
 ## Validate the receiver SNR estimate
+
+The retained [SNR_VALIDATION.csv](SNR_VALIDATION.csv) is a v1.0 result. To
+reproduce it exactly, first check out the tag and commit identified above, then
+run:
 
 ```sh
 make snr-validation
@@ -62,6 +75,10 @@ empirical correction.
 
 ## Reproduce an indexed trial
 
+The following commands reproduce the frozen values only from the v1.0 source
+identified above. Running them from the current HEAD measures the current
+receiver instead.
+
 ```sh
 make -f study/Makefile.reproduce
 study/build/reproduce signal 3 average 1 1 study/build/signal.csv
@@ -72,6 +89,21 @@ Each command creates one new output file. [MODEL.md](MODEL.md) specifies the
 complete index ranges, calibration command and compiler-dependent RNG details.
 [REPRODUCTION_CHECK.txt](REPRODUCTION_CHECK.txt) records exact deterministic
 matches for one existing signal trial and one noise-check trial.
+
+## Validate the current wide receiver
+
+The current +/-750 Hz acquisition and the USB 300..4000 Hz frontend model have
+a separate, manual Monte Carlo harness. It requires Python 3 and NumPy and is
+not run by `test` or `strict`:
+
+```sh
+make wide-validation
+```
+
+The target performs 6,400 blind receiver calls and writes generated CSV files
+under `study/build/wide-acquisition`. Fixed seeds, the LP1850 mapping, summary
+statistics, and the gate decision are recorded in
+[WIDE-ACQUISITION-VALIDATION.txt](../docs/WIDE-ACQUISITION-VALIDATION.txt).
 
 ## Data identities
 
@@ -84,7 +116,8 @@ reproduction and plotting source files. Complete copies of physical CSV files
 preserve their source hashes; extracted columns preserve the recorded
 numerical text.
 
-The package contains the sources and data needed to build, analyze and
-reproduce this study.
+The current package retains the study data and analysis source. The exact
+receiver source used to reproduce the stored trials is preserved by the v1.0.0
+tag and commit identified at the top of this file.
 Code licensing follows [GPL-3.0-or-later](../LICENSE), with the retained
 [QRA attribution](../licenses/QRA-NOTICE.txt).

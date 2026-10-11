@@ -44,8 +44,10 @@ sha256sum -c tests/fixtures/FIXTURES.sha256 > "$scratch/fixtures.log"
 ./bin/qf256 info > "$scratch/info.json"
 json_object "$scratch/info.json"
 grep -Eq '"payload_bits"[[:space:]]*:[[:space:]]*77' "$scratch/info.json" || fail 'wrong payload size'
-grep -Eq '"version"[[:space:]]*:[[:space:]]*"1\.0\.0"' "$scratch/info.json" || fail 'wrong software version'
+grep -Eq '"version"[[:space:]]*:[[:space:]]*"1\.1\.0"' "$scratch/info.json" || fail 'wrong software version'
 grep -Eq '"api_version"[[:space:]]*:[[:space:]]*1' "$scratch/info.json" || fail 'wrong API version'
+grep -Eq '"blind_cfo_limit_hz"[[:space:]]*:[[:space:]]*7\.50000000000000000E\+002' "$scratch/info.json" || fail 'wrong blind CFO limit'
+grep -Eq '"gate"[[:space:]]*:[[:space:]]*3\.02207587758484237E\+001' "$scratch/info.json" || fail 'wrong evidence gate'
 grep -Eq '"snr_estimate_available"[[:space:]]*:[[:space:]]*true' "$scratch/info.json" || fail 'SNR capability missing'
 checks=$((checks+1))
 

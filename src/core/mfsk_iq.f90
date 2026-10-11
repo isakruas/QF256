@@ -8,7 +8,8 @@ module mfsk_iq_mod
   implicit none
   private
   public :: sc_config,sc_result,setup_sc,sc_tx,sc_rx,sc_peak_reference
-  public :: mfsk_statistics,estimate_n0,estimate_snr_2500,mfsk_filtered_waveform
+  public :: mfsk_statistics,estimate_n0,estimate_tone_n0,estimate_snr_2500,mfsk_filtered_waveform
+  real(dp),parameter,public :: blind_cfo_limit_hz=750.0_dp
   type sc_config
     integer :: id=5,nsym=76,ndata=60,npilot=16,n,ns,ntaps,half
     real(dp) :: fs,duration,ts=0.128_dp,spacing=7.8125_dp,lowpass_hz=2000.0_dp
@@ -171,6 +172,33 @@ contains
     noise=max(power/(count*window_energy*fs),1.0e-20_dp)
   end function estimate_n0
 
+  real(dp) function estimate_tone_n0(energy) result(noise)
+    ! A channel may remove the public out-of-band noise guards while leaving
+    ! the 256-FSK tones intact.  In each data symbol only one of the 256
+    ! orthogonal projections carries signal, so the middle two order
+    ! statistics provide a robust in-band noise estimate.  The normalization
+    ! is the exact expected mean of those two order statistics for 256
+    ! unit-mean exponential samples.
+    real(dp),intent(in) :: energy(0:255,60)
+    real(dp),parameter :: median_expectation=0.6951041202281072_dp
+    real(dp) :: ordered(256),value,total
+    integer :: symbol,i,j
+    total=0
+    do symbol=1,60
+      ordered=energy(:,symbol)
+      do i=2,256
+        value=ordered(i);j=i-1
+        do while(j>=1)
+          if(ordered(j)<=value)exit
+          ordered(j+1)=ordered(j);j=j-1
+        end do
+        ordered(j+1)=value
+      end do
+      total=total+.5_dp*(ordered(128)+ordered(129))/median_expectation
+    end do
+    noise=max(total/60.0_dp,1.0e-20_dp)
+  end function estimate_tone_n0
+
   subroutine search_sync(iq,cfg,smin,smax,sstep,fmin,fmax,fstep,start,cfo,score)
     ! Rolling complex sums evaluate all trial starts with only one tone mixing
     ! pass per public pilot and CFO.
@@ -221,13 +249,26 @@ contains
     type(sc_config),intent(in) :: cfg
     integer,intent(out) :: start
     real(dp),intent(out) :: cfo,score
-    integer :: initial,lo,hi
-    real(dp) :: initial_cfo,lowfreq,highfreq
+    integer :: coarse_start,refined_start,lo,hi
+    real(dp) :: coarse_cfo,refined_cfo,lowfreq,highfreq,coarse_step,middle_step,fine_step
     lo=nint(.3_dp*cfg%fs);hi=nint(.7_dp*cfg%fs)
-    call search_sync(iq,cfg,lo,hi,cfg%ns/16,-10.0_dp,10.0_dp,.5_dp,initial,initial_cfo,score)
-    lowfreq=max(-10.0_dp,initial_cfo-.5_dp);highfreq=min(10.0_dp,initial_cfo+.5_dp)
-    call search_sync(iq,cfg,max(lo,initial-cfg%ns/16),min(hi,initial+cfg%ns/16), &
-      max(1,cfg%ns/384),lowfreq,highfreq,.025_dp,start,cfo,score)
+    ! Search a fixed complex-baseband interval, independent of RF tuning.
+    ! A tone-spacing/2 first grid bounds coherent loss, then two local grids
+    ! recover the original final frequency and timing resolution without
+    ! evaluating every fine hypothesis across the complete interval.
+    coarse_step=cfg%spacing/2
+    middle_step=cfg%spacing/32
+    fine_step=cfg%spacing/320
+    call search_sync(iq,cfg,lo,hi,cfg%ns/16,-blind_cfo_limit_hz,blind_cfo_limit_hz, &
+      coarse_step,coarse_start,coarse_cfo,score)
+    lowfreq=max(-blind_cfo_limit_hz,coarse_cfo-coarse_step)
+    highfreq=min(blind_cfo_limit_hz,coarse_cfo+coarse_step)
+    call search_sync(iq,cfg,max(lo,coarse_start-cfg%ns/16),min(hi,coarse_start+cfg%ns/16), &
+      max(1,cfg%ns/96),lowfreq,highfreq,middle_step,refined_start,refined_cfo,score)
+    lowfreq=max(-blind_cfo_limit_hz,refined_cfo-middle_step)
+    highfreq=min(blind_cfo_limit_hz,refined_cfo+middle_step)
+    call search_sync(iq,cfg,max(lo,refined_start-cfg%ns/96),min(hi,refined_start+cfg%ns/96), &
+      max(1,cfg%ns/384),lowfreq,highfreq,fine_step,start,cfo,score)
   end subroutine acquire
 
   subroutine mfsk_statistics(iq,cfg,start,cfo,energy)
@@ -311,8 +352,8 @@ contains
     character(*),intent(in) :: sync
     type(sc_result),intent(out) :: result
     real(dp),allocatable :: energy(:,:),probability(:,:)
-    real(dp) :: n0,score,t0,t1
-    call cpu_time(t0);result=sc_result();n0=estimate_n0(iq,cfg%fs)
+    real(dp) :: n0,guard_n0,tone_n0,score,t0,t1
+    call cpu_time(t0);result=sc_result();guard_n0=estimate_n0(iq,cfg%fs)
     allocate(energy(0:255,60),probability(0:255,60))
     if(sync=='blind')then
       call acquire(iq,cfg,result%start,result%cfo,score)
@@ -322,6 +363,11 @@ contains
       error stop 'MFSK synchronization must be known or blind'
     end if
     call mfsk_statistics(iq,cfg,result%start,result%cfo,energy)
+    tone_n0=estimate_tone_n0(energy);n0=guard_n0
+    ! Preserve the calibrated guard estimate when those bands are present.
+    ! If a receiver passband has suppressed them by more than 3 dB, use the
+    ! robust in-band estimate instead of feeding near-zero N0 to the decoder.
+    if(guard_n0<.5_dp*tone_n0)n0=tone_n0
     call qra_metric(energy,n0,probability)
     call qra_decode(probability,cfg%code,result%payload,result%crc_ok,result%iterations,max_iterations=100)
     result%noise_variance=cfg%fs*n0;result%evidence=score/n0-16

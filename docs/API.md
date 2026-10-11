@@ -3,7 +3,7 @@
 The modem profile is fixed:
 12,000 complex samples/s, 77 payload bits, 116,800 transmitted complex samples
 (9.733333333333333 seconds, including filter tails), and acceptance threshold
-`22.644583913858970`. Encoding normalizes the complete frame to mean complex
+`30.220758775848424`. Encoding normalizes the complete frame to mean complex
 power one. The encode/decode API operates on complex IQ at the specified rate;
 file conversion is handled separately.
 
@@ -33,8 +33,8 @@ message)` accepts `known` or `blind`. Both routines have an optional output
 character argument `message`; a short caller buffer truncates it normally.
 Constants exported by the module include `qf256_sample_rate`,
 `qf256_frame_samples`, `qf256_payload_bits`, `qf256_blind_min_samples`,
-`qf256_max_samples`, `qf256_gate`, `qf256_snr_reference_hz`, synchronization
-values and status codes.
+`qf256_max_samples`, `qf256_gate`, `qf256_blind_cfo_limit_hz`,
+`qf256_snr_reference_hz`, synchronization values and status codes.
 
 `sc_result` is re-exported from the core. Its payload and `crc_ok` describe the
 raw decode. The separate `accepted` output additionally applies the fixed
@@ -51,12 +51,14 @@ estimate defined below.
 | Mode | Minimum complex samples | Meaning |
 |---|---:|---|
 | `known` / `QF256_SYNC_KNOWN` | 116800 | Frame starts at offset zero; residual CFO is assumed zero. |
-| `blind` / `QF256_SYNC_BLIND` | 125200 | Search frame starts from 0.3 through 0.7 seconds and CFO from −10 through +10 Hz. |
+| `blind` / `QF256_SYNC_BLIND` | 125200 | Search frame starts from 0.3 through 0.7 seconds and complex-baseband CFO from −750 through +750 Hz. |
 
 The maximum length is 180000 complex samples (15 seconds) in either mode.
 The blind minimum accommodates the whole filtered frame at the latest searched
 start. Provide one capture window per call. Surrounding samples within the
-accepted length contribute to the noise estimate. Sample offsets are zero-based.
+accepted length contribute to the guard-band noise estimate; the selected N0
+may instead use the aligned in-band tone projections as described below.
+Sample offsets are zero-based.
 
 Every IQ component must be finite. Fortran `real64` components above `1e90` in
 absolute value are rejected to avoid arithmetic overflow;
@@ -96,7 +98,7 @@ layout is defined by the header and interoperable Fortran `qf256_result_c`:
 | `start_samples`, `iterations` | `int32_t` each | Zero-based capture offset and FEC iterations. |
 | `start_seconds` | `double` | `start_samples / 12000`. |
 | `cfo_hz` | `double` | Estimated residual frequency offset. |
-| `noise_variance` | `double` | Estimated complex sample noise power, `fs*N0`. |
+| `noise_variance` | `double` | Selected complex sample noise-power estimate, `fs*N0`. |
 | `evidence` | `double` | Pilot energy / estimated `N0` minus 16. |
 | `latency_ms` | `double` | Core process CPU time, excluding adapter conversion/validation. |
 | `snr_2500_db` | `double` | Active-frame signal-to-noise estimate referenced to 2500 Hz. |
@@ -125,7 +127,7 @@ converts float32 input to the core's float64 arithmetic.
 The SNR result is computed only after the decoder produces a CRC-valid payload.
 Let \(\hat t_j\) be the decoded tone for data symbol \(j\),
 \(E_{\hat t_j,j}\) its received matched-projection energy, and \(\widehat N_0\)
-the guard-band estimate. The receiver regenerates the decoded payload as a
+the selected N0 estimate. The receiver regenerates the decoded payload as a
 clean, complete frame with mean complex power one and measures its corresponding
 correct-bin energies \(E^{(1)}_{\hat t_j,j}\). It then evaluates
 
@@ -144,7 +146,9 @@ symbol therefore gives an unbiased signal-power estimate before the logarithm.
 positive power estimate. The estimate is separate from `evidence`, which is the
 pilot acquisition statistic and is not an SNR.
 
-The fixed-seed validation in `study/validate_snr.f90` used 128 cases per point.
+The following fixed-seed results are retained from the v1.0 guard-only
+receiver and are historical rather than a validation of the current expanded
+acquisition. `study/validate_snr.f90` used 128 cases per point.
 Across AWGN levels −24 through −14 dB, bias ranged from −0.080 to −0.023 dB and
 RMSE from 0.892 to 0.234 dB. On CRC-valid decodes in the official moderate HF
 profile at −18/−16/−14 dB, the valid counts were 115/127/128, bias
@@ -176,12 +180,24 @@ PCM values by 32768, constructs the analytic signal with a zero-padded FFT,
 divides by `sqrt(2)`, and mixes by `-center_hz`. Both conversions retain the
 sample count. The default center is 1,500 Hz; supported centers are 1,100–4,500 Hz.
 
-The IQ noise estimator uses guard bands from −5,000 to −2,500 Hz and 2,500 to 5,000 Hz.
-A capture filtered to the tone bandwidth omits these bands. WAV analytic
-conversion keeps the positive-frequency audio spectrum before translation;
-it does not supply the same guard-band noise as full-band complex IQ. Thus
-noise, SNR, and evidence estimates from converted WAV can differ from those of
-the corresponding full-band IQ capture.
+The receiver first estimates N0 from IQ guard bands −5,000 to −2,500 Hz and
+2,500 to 5,000 Hz. It also forms an in-band estimate from the 256 data-tone
+projections: for each of 60 data symbols it averages order statistics 128 and
+129, divides by the exact unit-exponential expectation
+`0.6951041202281072`, then averages the symbols. Guards remain preferred when
+present. If `guard_n0 < 0.5 * tone_n0`, the receiver selects the robust in-band
+estimate, which prevents a filtered frontend from supplying a near-zero N0 to
+the soft decoder.
+
+WAV analytic conversion keeps the positive-frequency audio spectrum before
+translation, so it does not supply the same guards as full-band complex IQ.
+The fallback makes such filtered input decodable, but its selected noise, SNR,
+and evidence can still differ from the corresponding full-band IQ capture.
+The ±750 Hz acquisition interval is an IQ contract. Because QF256 tones extend
+to ±996.09375 Hz, a real 0..6000 Hz WAV path needs a center approximately in
+the range 1746.09375..4253.90625 Hz for full ±750 Hz coverage, plus a frontend
+passband that actually retains those frequencies. The 1500 Hz default covers
+the nominal zero-CFO waveform but not the complete negative-CFO limit.
 
 RX JSON reports `accepted`, `crc_ok`, `payload77`, `payload_hex`, `start_sample`,
 `start_s`, `cfo_hz`, `noise_variance`, `estimated_n0`, `evidence`, `gate`,
@@ -193,7 +209,7 @@ equals `noise_variance/12000`. `reference_iq_layout` is true for IQ input with
 180,000 complex samples and blind synchronization.
 
 The acceptance rule is valid CRC/FEC and
-`evidence >= 22.644583913858970`. Evidence is a dimensionless detection statistic,
+`evidence >= 30.220758775848424`. Evidence is a dimensionless detection statistic,
 not a probability or signal SNR.
 
 CLI exit status is 0 for success, 1 for a valid capture with no accepted message,
