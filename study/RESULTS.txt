@@ -1,0 +1,25 @@
+QF256 completed-record analysis
+3072 signal records: 1536 source/channel/noise cases paired across two power constraints.
+24 channel/power/SNR cells, 128 records each; SNR grid -24,-22,-20,-18,-16,-14 dB.
+Correct accepted means all source bits recovered and operational acceptance passed.
+Missed means no accepted message; accepted wrong is reported separately.
+moderate average 414/768 correct; missed=354; accepted wrong=0
+hard average 370/768 correct; missed=398; accepted wrong=0
+both average 784/1536 correct; missed=752; accepted wrong=0
+moderate peak 367/768 correct; missed=401; accepted wrong=0
+hard peak 319/768 correct; missed=449; accepted wrong=0
+both peak 686/1536 correct; missed=850; accepted wrong=0
+moderate average interpolated 50%= -19.39726 dB; simultaneous 95% grid bracket [-20,-18] dB
+hard average interpolated 50%= -18.82500 dB; simultaneous 95% grid bracket [-20,-18] dB
+moderate peak interpolated 50%= -18.80519 dB; simultaneous 95% grid bracket [-20,-18] dB
+hard peak interpolated 50%= -17.87302 dB; simultaneous 95% grid bracket [-20,-16] dB
+Recomputed calibration type7 99th-percentile gate:   2.2644583913858973E+01
+calibration: captures=2048; raw FEC=0; gated events=0; evidence exceedances=21
+independent: captures=4096; raw FEC=0; gated events=0; evidence exceedances=44
+Independent one-sided exact 95% upper per 15-second capture:   7.3111255647539952E-04
+This total bound is exact for a common event probability and conservative for an allocation-weighted mean if noise-scale probabilities differ.
+Zero raw FEC events means these records do not measure an observed reduction caused by the gate.
+Threshold point estimates interpolate the observed 2 dB grid; grid brackets assume a monotone true response.
+Each bracket uses six simultaneous exact binomial intervals (Bonferroni, 95% coverage per curve).
+Grid aggregates are descriptive; paired power records are not independent additional trials.
+All outputs were computed from completed records. No waveform, channel or noise simulation was executed.

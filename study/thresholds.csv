@@ -1,0 +1,5 @@
+channel,power_constraint,linear_50pct_crossing_db,interpolation_left_db,interpolation_right_db,simultaneous95_grid_lower_db,simultaneous95_grid_upper_db,interval_method
+moderate,average,-1.9397260273972602E+001,-20,-18,-20,-18,Bonferroni_exact_binomial_6_knots_monotone_response
+hard,average,-1.8824999999999999E+001,-20,-18,-20,-18,Bonferroni_exact_binomial_6_knots_monotone_response
+moderate,peak,-1.8805194805194805E+001,-20,-18,-20,-18,Bonferroni_exact_binomial_6_knots_monotone_response
+hard,peak,-1.7873015873015873E+001,-18,-16,-20,-16,Bonferroni_exact_binomial_6_knots_monotone_response

@@ -1,0 +1,57 @@
+QF256 build, regression, and study verification
+Date: 2026-10-10
+Working directory: QF256 project root (.).
+Platform: Linux x86_64
+Toolchain: GNU Fortran and GCC (Debian 14.2.0-19) 14.2.0; GNU Make.
+Plot renderer: GNUplot 6.0 patchlevel 2, pdfcairo/pngcairo terminals.
+
+Default clean compilation:
+  make clean
+  make -j4 all bin/test_core bin/test_io bin/test_api bin/test_c_api tools
+Execution and regeneration:
+  make test examples-check
+  make test-c-api
+  make study-analysis
+  make snr-validation
+Strict clean compilation and verification:
+  make strict
+Article:
+  make report
+
+The default and strict builds compile the three CLIs, static/shared libraries,
+core/I/O/Fortran/C tests, fixture utility, record analyzer, physical summarizer,
+and single-trial reproduction harness. The fixture utility is compiled but
+not run against the retained expected fixtures. Documented examples execute
+both IQ/WAV paths with known and blind synchronization.
+
+Results:
+  Compiler warnings: 0. Compiler errors: 0.
+  Strict Fortran and C flags include -Wall -Wextra -Werror.
+  88 core checks, 26 I/O checks, and 39 CLI checks passed.
+  Fortran API validation and known-sync roundtrip passed.
+  C ABI layout, validation, SNR, known-sync and blind-sync roundtrips passed.
+  Four documented IQ/WAV example receive cases passed.
+  Raw CF32 frame hash, exact WAV bytes, and all fixture checksums matched.
+  Analysis validated all 3072 signal and 6144 noise records.
+  Physical analysis validated 3072 records and summarized 1536 unique cases.
+  Regenerated numerical CSV tables/CDFs match the retained output hashes.
+  Study targets recompute statistics from the included measurement records.
+  Fixed-seed SNR validation used 128 cases per point. AWGN bias was
+  -0.080..-0.023 dB with RMSE 0.234..0.892 dB over -24..-14 dB. Moderate
+  fading bias was -0.166/-0.250/-0.226 dB with RMSE 0.925/1.029/1.002 dB;
+  hard fading bias was -0.764/-0.963/-1.009 dB with RMSE
+  1.049/1.318/1.270 dB at -18/-16/-14 dB.
+
+Complete logs:
+  BUILD.log, TEST.log, TEST-C-API.log, STRICT-BUILD.log,
+  STUDY-BUILD.log, STUDY-REGENERATION.log, REPORT-BUILD.log.
+Local project and toolchain prefixes in these distribution logs are replaced
+with <project-root> and <tex-install>; commands and diagnostics are preserved.
+Analysis details: ../study/ANALYSIS.log and ../study/RESULTS.txt.
+Runtime dependencies: RUNTIME-DEPS.txt. CLI help: CLI-HELP.txt.
+Source integrity: CORE.sha256 and CORE-STATEMENTS.txt.
+Data and source consistency checks: AUDIT.txt.
+
+Article toolchain: pdfTeX 1.40.29 / TeX Live 2026. Output: 14 A4 pages.
+The final LaTeX pass contains no errors, warnings, overfull boxes or underfull
+boxes.

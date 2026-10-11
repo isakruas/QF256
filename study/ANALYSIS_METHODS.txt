@@ -1,0 +1,150 @@
+QF256 completed-record statistical analysis
+
+This directory contains an extraction of completed QF256 signal and pure-noise
+records. No new signal, channel, noise or decoder trials were generated for this
+analysis. Run `make -C study analysis` from the distribution root to rebuild the
+standalone Fortran analyzer and regenerate its CSV and LaTeX summaries. The
+analyzer uses no modem or simulation module. All computations use real64.
+
+Data identity and extraction
+
+DATA_SOURCES.csv identifies eight source CSV files by neutral source ID, role,
+row count and SHA256 of the complete original file bytes. confirmation.csv and
+noise.csv retain source_id/source_row so that every included observation maps
+to exactly one source record. The extractor copies the selected numeric/text
+fields without recomputing outcomes. It omits source system labels and unused
+fields. The supplied normalized records are sufficient to reproduce every
+summary; the original source files are not a runtime dependency. DATA.sha256
+protects the two normalized data files and their source-identity manifest.
+
+The optional extraction operation accepts a destination directory and eight
+CSV paths in the order listed by DATA_SOURCES.csv. It creates new files and
+refuses to overwrite existing ones. The extraction command is:
+  analyze extract DIRECTORY SIGNAL_1 SIGNAL_2 SIGNAL_3 SIGNAL_4 NOISE_1 NOISE_2 NOISE_3 NOISE_4
+Only the summarize operation is needed for ordinary reproduction.
+
+Signal design and validation
+
+There are 24 cells: two channels (moderate and hard), two power constraints
+(average and peak), and six reference-SNR settings (-24,-22,-20,-18,-16,-14 dB).
+Each cell has 128 completed trials. The two power constraints share the same
+1536 payload/channel/noise cases, producing 3072 records, not 3072 mutually
+independent cases. In each power constraint, the 12-cell grid has equal weights.
+Message tokens represent 71 varying bits followed by the fixed six-bit suffix
+101000, for a 77-bit payload. Tokens are hexadecimal integers with optional
+omitted leading zeros. These results characterize that source ensemble; they
+do not exhaustively test the modem's arbitrary 77-bit input domain.
+
+The analyzer checks every channel/power/SNR/trial tuple occurs exactly once,
+source row continuity, all source record counts, message pairing, matching
+true timing/CFO, acceptance consistency, iteration bounds and seed formulas.
+For channel IDs 3 (moderate) and 4 (hard), point p=1..6, trial t=1..128:
+  condition = (channel_id-1)*6 + p
+  payload_seed = 20261201 + condition*100003 + t*101
+  channel_seed = 20261201 + condition*200003 + t*307
+  recorded_noise_seed = 20261201 + condition*300007 + t*911
+The waveform replay specification documents the additional offset used by
+the IQ-noise generator. Mean power and actual mean-power SNR are preserved in
+confirmation.csv; the reference-SNR axis is not shifted for the peak constraint.
+
+Each signal record is categorized as correct accepted, missed (no accepted
+message), or accepted wrong. These three counts sum to the cell size. The
+recorded correct flag already includes operational acceptance. Every reported
+wrong count includes acceptance and an incorrect payload; it is not a raw
+CRC-failure count. There were zero accepted-wrong records in this dataset.
+
+Cell intervals and aggregates
+
+cells.csv gives two-sided 95% Wilson intervals separately for the marginal
+correct, missed and accepted-wrong event probabilities in each fixed cell.
+For k events among n=128, p=k/n, z=1.959963984540054 and d=1+z^2/n:
+  center = (p+z^2/(2*n))/d
+  radius = z*sqrt(p*(1-p)/n+z^2/(4*n^2))/d
+The endpoints are clipped to [0,1]. These are pointwise intervals, not a joint
+simultaneous confidence region across all event categories and cells.
+
+aggregate.csv reports counts and empirical equal-weight grid averages, with
+no pooled-binomial interval. Pooling different SNR/channel probabilities as
+a single common-probability sample is not justified. Its final combined-power
+row is explicitly a count of paired records, not independent trials.
+
+50% crossings and grid uncertainty
+
+For each channel/power curve, the point estimate linearly interpolates the two
+adjacent 2 dB grid points bracketing observed correct-acceptance probability
+0.5. It uses the reference-SNR axis and makes no subgrid waveform measurements.
+Full arithmetic precision is retained in thresholds.csv; the LaTeX fragment
+displays one decimal place. Interpolation is a descriptive curve convention.
+
+For uncertainty, each of the six binomial cell probabilities receives an
+exact Clopper-Pearson interval with tail probability 0.05/(2*6). Bonferroni
+therefore supplies at least 95% simultaneous coverage of the six probabilities
+within that one channel/power curve. The lower threshold bound is the largest
+grid SNR whose upper probability bound is below 0.5. The upper threshold bound
+is the smallest grid SNR whose lower probability bound is above 0.5. Under a
+monotone true response with a crossing in the tested range, this gives a
+conservative 95% grid bracket. It is not a confidence interval obtained by
+interpolating noisy endpoint bounds, and does not justify precision finer than
+the grid. Coverage is per curve, not jointly across all four curves. The
+analyzer verifies that the observed response in each curve is monotone.
+
+Exact binomial bounds are computed by bisection of binomial tail probabilities,
+using log-gamma arithmetic for the binomial terms. For zero events in n trials,
+the one-sided 95% upper bound simplifies to 1-exp(log(0.05)/n).
+
+Noise calibration and independent check
+
+The calibration lot contains 2048 complete 15-second captures, and the separate
+check lot contains 4096 captures. Every capture contains 180000 complex Gaussian
+noise samples at 12000 samples/s and no signal. For global index g starting at 1:
+  p=mod(g-1,6)+1; t=floor((g-1)/6)+1
+  noise_seed=base+p*300007+t*911+29
+  base=20263401 (calibration), 20263501 (independent check)
+  reference_scale_db=-26+2*p
+  complex sample variance=12000/(2500*10^(reference_scale_db/10))
+The two quadrature variances are each half the complex variance. These labels
+set noise amplitude only; no received SNR exists in a noise-only capture.
+
+The frozen gate is 22.644583913858970. It was selected from calibration evidence
+using the type-7 99th percentile: h=1+2047*0.99=2027.53 and interpolation between
+sorted values 2027 and 2028. The analyzer recomputes the quantile within a
+real64 rounding tolerance, validates each noise seed, global index, expected
+variance, acquisition bound and recorded decision, and checks disjoint seeds
+between the calibration and independent lots. Operational acceptance is raw
+FEC acceptance AND evidence at least the frozen gate.
+
+noise_summary.csv reports both lots but supplies inferential one-sided exact
+95% upper bounds only for the independent check, in total and at each reference
+noise scale. Calibration participated in threshold selection and is descriptive.
+The independent total has 0 accepted events in 4096 captures; its upper bound
+is 0.00073111255647539952 per 15-second capture. Raw FEC events are also zero in
+both lots, so these observations do not measure a reduction caused by gating.
+Evidence-only threshold exceedances are 21/2048 and 44/4096, respectively.
+
+The pooled zero-event bound is exact if all independent check captures have
+one common event probability. If the six noise scales have different event
+probabilities, the same bound is conservative for their allocation-weighted
+mean: independence gives P(no events)=product(1-p_i), and this product is no
+larger than (1-mean(p_i))^4096. The per-scale intervals retain their usual
+pointwise interpretation; the reported noise bounds are not simultaneous.
+
+Seed independence scope
+
+Calibration and independent noise seeds are disjoint, and the signal power
+constraints are deliberately paired. Six numeric noise-seed values also occur
+as signal payload-generation seed values in a different generator role:
+calibration indices 646,653,660 use 21561846,21862764,22163682;
+independent indices 11,18,1308 use 21765387,22066305,22262170.
+There is no claim that every RNG stream across every experiment is mutually
+independent. No data were dropped or rerun because of this provenance detail.
+
+Outputs
+
+cells.csv and cells.tex: 24 cells, complete event counts and Wilson intervals.
+aggregate.csv: descriptive grid totals and paired-record total.
+thresholds.csv and thresholds.tex: four crossings and conservative grid brackets.
+noise_summary.csv: calibration/check counts and independent exact upper bounds.
+RESULTS.txt: compact table-ready results. ANALYSIS.log: validation completion.
+publication-cells.tex and publication-thresholds.tex: publication layouts
+formatted by the Fortran analyzer from its result CSVs, without statistical
+recalculation or an additional scripting-language dependency.

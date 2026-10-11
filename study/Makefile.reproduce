@@ -1,0 +1,20 @@
+FC = gfortran
+FFLAGS = -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -Werror
+MOD = -Jstudy/build -Istudy/build
+CORE = src/core/numerics.f90 src/core/waveform_metrics.f90 src/core/qra_soft.f90 src/core/mfsk_iq.f90
+.PHONY: all physical-summary snr-validation
+all: study/build/reproduce study/build/summarize_physical study/build/validate_snr
+study/build:
+	mkdir -p $@
+study/build/reproduce: $(CORE) study/channel.f90 study/reproduce.f90 | study/build
+	$(FC) $(FFLAGS) $(MOD) $^ -o $@
+study/build/summarize_physical: study/summarize_physical.f90 | study/build
+	$(FC) $(FFLAGS) $< -o $@
+study/build/validate_snr: $(CORE) study/channel.f90 study/validate_snr.f90 | study/build
+	$(FC) $(FFLAGS) $(MOD) $^ -o $@
+physical-summary: study/build/summarize_physical
+	study/build/summarize_physical
+snr-validation: study/build/validate_snr
+	study/build/validate_snr > study/build/SNR_VALIDATION.csv
+	cmp study/SNR_VALIDATION.csv study/build/SNR_VALIDATION.csv
+	cat study/build/SNR_VALIDATION.csv

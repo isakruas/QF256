@@ -1,0 +1,31 @@
+mkdir -p build/mod
+mkdir -p lib
+mkdir -p bin
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Jbuild/mod -Ibuild/mod -c src/core/numerics.f90 -o build/numerics.o
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Jbuild/mod -Ibuild/mod -c src/core/waveform_metrics.f90 -o build/waveform_metrics.o
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Jbuild/mod -Ibuild/mod -c src/core/qra_soft.f90 -o build/qra_soft.o
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Jbuild/mod -Ibuild/mod -c src/core/mfsk_iq.f90 -o build/mfsk_iq.o
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Jbuild/mod -Ibuild/mod -c src/qf256_api.f90 -o build/qf256_api.o
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Jbuild/mod -Ibuild/mod -c src/io/qf256_io.f90 -o build/qf256_io.o
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -fcheck=all -Jbuild/mod -Ibuild/mod tests/test_core.f90 build/numerics.o build/waveform_metrics.o build/qra_soft.o build/mfsk_iq.o -o bin/test_core
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Jbuild/mod -Ibuild/mod tests/create_fixtures.f90 build/numerics.o build/waveform_metrics.o build/qra_soft.o build/mfsk_iq.o -o bin/create_fixtures
+make -C study all
+make[1]: Entering directory '<project-root>/study'
+mkdir -p build
+gfortran -O2 -std=f2008 -ffree-line-length-none -Wall -Wextra -Werror -fcheck=all -Jbuild analyze.f90 -o build/analyze
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Jbuild/mod -Ibuild/mod -c src/qf256_cli.f90 -o build/qf256_cli.o
+ar rcs lib/libqf256.a build/numerics.o build/waveform_metrics.o build/qra_soft.o build/mfsk_iq.o build/qf256_api.o build/qf256_io.o
+gfortran -shared -o lib/libqf256.so build/numerics.o build/waveform_metrics.o build/qra_soft.o build/mfsk_iq.o build/qf256_api.o build/qf256_io.o
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -fcheck=all -Jbuild/mod -Ibuild/mod tests/test_io.f90 lib/libqf256.a -o bin/test_io
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -fcheck=all -Jbuild/mod -Ibuild/mod tests/test_qf256_api.f90 lib/libqf256.a -o bin/test_api
+cc -std=c11 -O2 -Wall -Wextra -Iinclude tests/test_qf256_api_c.c -Llib -lqf256 -Wl,-rpath,'$ORIGIN/../lib' -lm -o bin/test_c_api
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Jbuild/mod -Ibuild/mod app/qf256.f90 build/qf256_cli.o lib/libqf256.a -o bin/qf256
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Jbuild/mod -Ibuild/mod app/qf256_tx.f90 build/qf256_cli.o lib/libqf256.a -o bin/qf256-tx
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Jbuild/mod -Ibuild/mod app/qf256_rx.f90 build/qf256_cli.o lib/libqf256.a -o bin/qf256-rx
+make[1]: Leaving directory '<project-root>/study'
+make -f study/Makefile.reproduce all
+make[1]: Entering directory '<project-root>'
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -Werror -Jstudy/build -Istudy/build src/core/numerics.f90 src/core/waveform_metrics.f90 src/core/qra_soft.f90 src/core/mfsk_iq.f90 study/channel.f90 study/reproduce.f90 -o study/build/reproduce
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -Werror study/summarize_physical.f90 -o study/build/summarize_physical
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -Werror -Jstudy/build -Istudy/build src/core/numerics.f90 src/core/waveform_metrics.f90 src/core/qra_soft.f90 src/core/mfsk_iq.f90 study/channel.f90 study/validate_snr.f90 -o study/build/validate_snr
+make[1]: Leaving directory '<project-root>'

@@ -1,0 +1,10 @@
+QRA graph/weights: qra15_65_64_irr_e23.c, copyright 2020 Nico Palermo IV3NWV,
+Microtelecom Srl. QRA algorithm and metric: qracodes.c, copyright 2016 Nico
+Palermo. These sources carry GPL version 3 or later. QF256 contains a Fortran
+implementation and the adapted graph/constants, distributed under GPL-3.0-or-later.
+Q65 CRC and encoding reference: q65_encoding_modules.f90 and q65.c, WSJT-X.
+Source package WSJT-X 2.7.0+repack-1 from Debian Sources, retrieved 2026-10-10:
+https://sources.debian.org/data/main/w/wsjtx/2.7.0%2Brepack-1/lib/qra/q65/
+Primary protocol reference:
+https://wsjt.sourceforge.io/Q65_Quick_Start.pdf
+License text: ../LICENSE.

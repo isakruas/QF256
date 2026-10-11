@@ -1,0 +1,188 @@
+\section{Performance-study method}
+\label{sec:study}
+
+\subsection{Channel and observation model}
+
+The study uses two Gaussian-scatter tapped-delay profiles in the spirit of
+stationary HF channel modeling \cite{watterson}. Their exact implementation
+is defined here, rather than identified with a standardized profile. Let
+$x[n]$ be the normalized transmit frame, extended by zero outside its
+support, and let $A$ apply the chosen transmit-power constraint. With
+$t=(n-s)/f_s$, the received capture is
+\begin{equation}
+ y[n]=A e^{\mathrm j2\pi\nu t}
+       \sum_{\ell=1}^{2}\sqrt{P_\ell}\,g_\ell(t)
+          x[n-s-d_\ell]+w[n],\qquad 0\le n<180000.
+ \label{eq:channel}
+\end{equation}
+Here $s$ is an integer start offset, $\nu$ is constant CFO, and the path
+processes are mutually independent. Each has the finite spectral representation
+\begin{equation}
+ g_\ell(t)=\sum_{k=1}^{64}c_{\ell k}e^{\mathrm j2\pi F_{\ell k}t},\quad
+ c_{\ell k}\sim\mathcal{CN}(0,1/64),\quad
+ F_{\ell k}\sim\mathcal N(0,(B_D/2)^2).
+ \label{eq:fading}
+\end{equation}
+Averaging over both coefficients and frequencies gives
+$\E|g_\ell|^2=1$ and correlation
+$R_g(\tau)=\exp(-\pi^2 B_D^2\tau^2/2)$.
+A realization contains 64 spectral lines; it approximates the continuous
+Gaussian spectrum. Individual fades are not power-normalized.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Profile & Delays & Path powers & $B_D=2\sigma_F$ \\
+\midrule
+Moderate & 0, 1\,ms (0, 12 samples) & $1/2,1/2$ & 1\,Hz \\
+Hard & 0, 2\,ms (0, 24 samples) & $1/2,1/2$ & 4\,Hz \\
+\bottomrule
+\end{tabular}
+\caption{The two simulated HF profiles at $f_s=12$\,kHz.}
+\label{tab:channel}
+\end{table}
+
+The delays in Table~\ref{tab:channel} are exact integer sample shifts.
+Fading is evaluated from the frame origin, and delayed tails are retained.
+The start is drawn uniformly from $[0.4,0.6)$\,s and rounded to the nearest
+sample; CFO is uniform over $[-2,2)$\,Hz. There is no frequency drift.
+The receiver receives only the capture and fixed public configuration;
+it searches the larger region specified in Section~\ref{sec:rx}.
+
+Noise is independently generated for all 180,000 capture samples, including
+samples outside the burst. For a reference level $\rho$ in dB,
+\begin{equation}
+ N_0=\frac{1}{2500\,10^{\rho/10}},\qquad
+ w[n]\sim\mathcal{CN}(0,f_sN_0).
+ \label{eq:snrref}
+\end{equation}
+Each real quadrature has variance $f_sN_0/2$. Noise is not rescaled by the
+instantaneous faded receive power or by the waveform bandwidth.
+
+\subsection{Transmit power, energy, and waveform measurements}
+
+In the unit-average setting $A=1$, so the active-frame transmit power
+$P_{\rm av}=1$ and energy $E=\sum|Ax[n]|^2/f_s=T_f$. In the unit-peak
+setting, $A=1/\sqrt{P_{\rm pk,ref}}$, where $P_{\rm pk,ref}$ is the larger
+of the peaks obtained by regenerating the waveform at 48 and 192\,kHz,
+normalized by the 12\,kHz frame's pre-normalization mean power. The
+48 and 192\,kHz FIRs contain 257 and 1025 taps, respectively, preserving
+the kernel support of $\pm32/12000\seconds$ in \eqref{eq:fir}
+\cite{physical}. The check requires the two peak estimates to agree within
+0.05\,dB. Consequently,
+$P_{\rm av}=1/P_{\rm pk,ref}$ and $E=T_f/P_{\rm pk,ref}$ in that setting.
+These are measured oversampled peaks, not a proof of a continuous-time
+supremum.
+
+The horizontal coordinate $\rho$ always denotes the unit-reference level
+in \eqref{eq:snrref}. Actual average transmit SNR and source-bit energy are
+\begin{equation}
+ \mathrm{SNR}_{2500}=\rho+10\log_{10}P_{\rm av},\qquad
+ (E_b/N_0)_{77}=\rho+10\log_{10}(2500E/77).
+ \label{eq:physicalsnr}
+\end{equation}
+The first equals $\rho$ only under unit-average normalization. In the
+unit-peak setting it is approximately $\rho-0.711\dB$. These quantities
+refer to transmit power and ensemble channel normalization, not to the
+power of a particular faded receive frame. Dividing by 77 counts supplied
+payload bits; the sampled payload entropy is 71 bits as described below.
+
+Bandwidth is measured on the complete active waveform before the channel.
+An unwindowed FFT is zero-padded to the next power of two at least $4N_f$
+(524,288 points here). The ordered, two-sided squared spectrum defines
+cumulative-energy quantiles $f_{0.005}$ and $f_{0.995}$, interpolated within
+bins. The reported width is $B_{99}=f_{0.995}-f_{0.005}$; FFT spacing is
+approximately 0.0229\,Hz. PAPR is
+$10\log_{10}(P_{\rm pk,ref}/P_{\rm av,12k})$ for the unscaled waveform.
+Here $P_{\rm av,12k}$ is the mean power of the normalized 12\,kHz frame,
+approximately one, before unit-peak scaling.
+Both width and PAPR are invariant under the subsequent constant peak scaling.
+
+\subsection{Sampling and fixed receiver configuration}
+
+For each profile, the reference levels are
+$\{-24,-22,-20,-18,-16,-14\}\dB$, with 128 separately seeded frames in every
+cell. The two power settings reuse the payload, fading, noise, start, and
+CFO draws: there are 1536 underlying randomized cases and 3072 outcome
+records, not 3072 independent realizations. Outcomes within a cell use
+different payload, channel, and noise seeds. The analysis makes no
+independence assumption between power settings.
+
+The message generator draws 71 random bits and appends the fixed suffix
+\texttt{101000}. It consumes 18 uniform draws to form the random part;
+the next two draws set start and CFO. Thus the error-rate experiment samples
+a defined subset of the encoder's $2^{77}$ codebook. With profile index
+$q\in\{3,4\}$, SNR index $j\in\{1,\ldots,6\}$, trial
+$i\in\{1,\ldots,128\}$, $c=6(q-1)+j$, and $b=20261201$, the seeds are
+\begin{align}
+ s_p&=b+100003c+101i,\nonumber\\
+ s_h&=b+200003c+307i,\nonumber\\
+ s_w&=b+300007c+911i+29.
+ \label{eq:seeds}
+\end{align}
+The Fortran random generator is initialized separately for these streams;
+Gaussian values use the documented Box--Muller transform. Bitwise replay
+therefore depends on the retained GNU Fortran runtime convention. The
+standalone harness implements the same initialization and draw order.
+
+The waveform, QRA graph, metric, iteration limit, acquisition bounds, sample
+counts, channel settings, and confirmation grid were fixed before the reported
+confirmation outcomes were inspected. Only the pilot-evidence threshold was calibrated,
+using a separate 2048-capture noise lot. Its type-7 empirical 99th percentile
+is
+\begin{equation}
+ \eta_0=0.47\eta_{(2027)}+0.53\eta_{(2028)}=\Gate,
+ \label{eq:calgate}
+\end{equation}
+where parentheses index the sorted calibration evidence values. The
+threshold and records were hashed before the independent noise check and
+confirmation analysis. It was not retuned using the reported outcomes
+\cite{study}.
+
+\subsection{Endpoints and uncertainty}
+
+A signal trial succeeds only when the final acceptance rule passes and all
+77 recovered bits equal the transmitted bits. An erasure is a trial with no
+accepted message; an incorrect acceptance passes the rule with different
+bits. These three counts sum to the cell size. Frame error rate is one minus
+correct acceptance, so it includes both erasures and incorrect acceptances.
+
+For $k$ correct acceptances among $n=128$ trials, $\widehat p=k/n$.
+The pointwise two-sided 95\% Wilson interval \cite{wilson} is
+\begin{equation}
+ \frac{\widehat p+z^2/(2n)\ \pm\
+ z\sqrt{\widehat p(1-\widehat p)/n+z^2/(4n^2)}}{1+z^2/n},
+ \qquad z=1.95996398454.
+ \label{eq:wilson}
+\end{equation}
+These are cell intervals, not simultaneous confidence bands. The grid
+average weights all twelve profile/SNR cells equally and is reported as
+a descriptive summary, without treating heterogeneous cells as one binomial
+population.
+
+The estimated 50\% crossing linearly interpolates the two adjacent empirical
+rates that bracket 0.5. It is reported to 0.1\,dB because the grid spacing is
+2\,dB. To express sampling uncertainty without assuming a subgrid curve
+shape, each curve also receives a conservative grid bracket. Exact binomial
+intervals use a Bonferroni allocation across its six points (tail probability
+$0.05/12$). The bracket extends from the highest grid point whose upper
+bound is below 0.5 to the lowest whose lower bound exceeds 0.5. Its confidence
+interpretation requires monotone success probability in SNR; it is not an
+interval for the linear-interpolation model.
+
+The independent noise-only check uses 4096 fresh 15-second captures and
+retains the same blind receiver. Reference levels cycle through the six
+noise scales in \eqref{eq:snrref}; there is no received SNR without a signal.
+Calibration and check seeds are disjoint. For zero accepted messages, the
+one-sided exact 95\% binomial upper bound is \cite{clopper}
+\begin{equation}
+ p_U=1-0.05^{1/4096}=0.0007311125565.
+ \label{eq:falsebound}
+\end{equation}
+It is exact under a common capture probability. If probabilities differ
+between noise scales, it is conservative for their allocation-weighted mean:
+for independent captures, $\prod_i(1-p_i)\le(1-\overline p)^{4096}$.
+Calibration samples are excluded from this denominator. The supplied provenance also
+records limited scalar-seed coincidences with signal-payload seeds; the
+study does not assume complete mutual stream independence across all lots.

@@ -1,0 +1,18 @@
+sha256sum -c docs/CORE.sha256
+src/core/mfsk_iq.f90: OK
+src/core/numerics.f90: OK
+src/core/qra_soft.f90: OK
+src/core/waveform_metrics.f90: OK
+./bin/test_core
+PASS: 88 QF256 core regression checks
+./bin/test_api
+PASS: Fortran API validation and known roundtrip
+mkdir -p build/test/io
+./bin/test_io
+Analytic error=  1.2910228441853633E-12
+Analytic real-audio reconstruction error=  1.2910E-12 peak dBFS=  -3.0000972
+PASS 26 IO checks
+bash tests/check_cli.sh
+PASS: 39 QF256 CLI regression checks
+bash tests/check_examples.sh
+PASS: documented IQ/WAV examples with known and blind synchronization

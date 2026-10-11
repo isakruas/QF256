@@ -1,0 +1,12 @@
+/build/
+/bin/
+/lib/
+/dist/
+/work/
+/study/build/
+/examples/run/
+*.mod
+docs/report/*.aux
+docs/report/*.log
+docs/report/*.out
+docs/report/*.toc

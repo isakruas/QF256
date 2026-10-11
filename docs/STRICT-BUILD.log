@@ -1,0 +1,68 @@
+make clean
+make[1]: Entering directory '<project-root>'
+rm -rf build bin lib study/build
+make[1]: Leaving directory '<project-root>'
+make FFLAGS="-O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror" CFLAGS="-std=c11 -O2 -Wall -Wextra -Werror" all test test-c-api examples-check study-analysis
+make[1]: Entering directory '<project-root>'
+mkdir -p build/mod
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -Jbuild/mod -Ibuild/mod -c src/core/numerics.f90 -o build/numerics.o
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -Jbuild/mod -Ibuild/mod -c src/core/waveform_metrics.f90 -o build/waveform_metrics.o
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -Jbuild/mod -Ibuild/mod -c src/core/qra_soft.f90 -o build/qra_soft.o
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -Jbuild/mod -Ibuild/mod -c src/core/mfsk_iq.f90 -o build/mfsk_iq.o
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -Jbuild/mod -Ibuild/mod -c src/qf256_api.f90 -o build/qf256_api.o
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -Jbuild/mod -Ibuild/mod -c src/io/qf256_io.f90 -o build/qf256_io.o
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -Jbuild/mod -Ibuild/mod -c src/qf256_cli.f90 -o build/qf256_cli.o
+mkdir -p lib
+ar rcs lib/libqf256.a build/numerics.o build/waveform_metrics.o build/qra_soft.o build/mfsk_iq.o build/qf256_api.o build/qf256_io.o
+mkdir -p bin
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -Jbuild/mod -Ibuild/mod app/qf256.f90 build/qf256_cli.o lib/libqf256.a -o bin/qf256
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -Jbuild/mod -Ibuild/mod app/qf256_tx.f90 build/qf256_cli.o lib/libqf256.a -o bin/qf256-tx
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -Jbuild/mod -Ibuild/mod app/qf256_rx.f90 build/qf256_cli.o lib/libqf256.a -o bin/qf256-rx
+gfortran -shared -o lib/libqf256.so build/numerics.o build/waveform_metrics.o build/qra_soft.o build/mfsk_iq.o build/qf256_api.o build/qf256_io.o
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -fcheck=all -Jbuild/mod -Ibuild/mod tests/test_core.f90 build/numerics.o build/waveform_metrics.o build/qra_soft.o build/mfsk_iq.o -o bin/test_core
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -fcheck=all -Jbuild/mod -Ibuild/mod tests/test_qf256_api.f90 lib/libqf256.a -o bin/test_api
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -fcheck=all -Jbuild/mod -Ibuild/mod tests/test_io.f90 lib/libqf256.a -o bin/test_io
+sha256sum -c docs/CORE.sha256
+src/core/mfsk_iq.f90: OK
+src/core/numerics.f90: OK
+src/core/qra_soft.f90: OK
+src/core/waveform_metrics.f90: OK
+./bin/test_core
+PASS: 88 QF256 core regression checks
+./bin/test_api
+PASS: Fortran API validation and known roundtrip
+mkdir -p build/test/io
+./bin/test_io
+Analytic error=  1.2910228441853633E-12
+Analytic real-audio reconstruction error=  1.2910E-12 peak dBFS=  -3.0000972
+PASS 26 IO checks
+bash tests/check_cli.sh
+PASS: 39 QF256 CLI regression checks
+cc -std=c11 -O2 -Wall -Wextra -Werror -Iinclude tests/test_qf256_api_c.c -Llib -lqf256 -Wl,-rpath,'$ORIGIN/../lib' -lm -o bin/test_c_api
+./bin/test_c_api
+PASS: C ABI layout, validation, SNR, known and blind roundtrips
+bash tests/check_examples.sh
+PASS: documented IQ/WAV examples with known and blind synchronization
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -Jbuild/mod -Ibuild/mod tests/create_fixtures.f90 build/numerics.o build/waveform_metrics.o build/qra_soft.o build/mfsk_iq.o -o bin/create_fixtures
+make -C study all
+make[2]: Entering directory '<project-root>/study'
+mkdir -p build
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -Jbuild analyze.f90 -o build/analyze
+make[2]: Leaving directory '<project-root>/study'
+make -f study/Makefile.reproduce all
+make[2]: Entering directory '<project-root>'
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -Jstudy/build -Istudy/build src/core/numerics.f90 src/core/waveform_metrics.f90 src/core/qra_soft.f90 src/core/mfsk_iq.f90 study/channel.f90 study/reproduce.f90 -o study/build/reproduce
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror study/summarize_physical.f90 -o study/build/summarize_physical
+gfortran -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -fPIC -Werror -Jstudy/build -Istudy/build src/core/numerics.f90 src/core/waveform_metrics.f90 src/core/qra_soft.f90 src/core/mfsk_iq.f90 study/channel.f90 study/validate_snr.f90 -o study/build/validate_snr
+make[2]: Leaving directory '<project-root>'
+make -C study analysis
+make[2]: Entering directory '<project-root>/study'
+./build/analyze summarize . > ANALYSIS.log
+make[2]: Leaving directory '<project-root>/study'
+make -f study/Makefile.reproduce physical-summary
+make[2]: Entering directory '<project-root>'
+study/build/summarize_physical
+Validated 3072 rows; summarized 1536 unique source cases across both power constraints.
+make[2]: Leaving directory '<project-root>'
+gnuplot study/plots.gp
+make[1]: Leaving directory '<project-root>'
