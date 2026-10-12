@@ -2,15 +2,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Fixed-seed validation of QF256 acquisition through an ideal USB frontend.
 
-This is a deliberately manual Monte Carlo harness. It is not part of the
-strict test target: the registered calibration and check comprise 6,144 blind
-receiver calls. Python 3 and NumPy are required. Each worker is a separate
-process because libqf256 is not thread-safe within one process.
+The independent check comprises 4,096 noise captures and 384 signal captures.
+Python 3 and NumPy are required. Each worker is a separate process because
+libqf256 is not thread-safe within one process. The gate is never retuned.
 """
 
 import argparse
 import csv
 import ctypes as C
+from datetime import datetime, timezone
+import hashlib
+import json
 import math
 import multiprocessing as mp
 from pathlib import Path
@@ -26,9 +28,27 @@ SIGNAL_FILTER_SAMPLES = 262144
 SIGNAL_FILTER_PAD = (SIGNAL_FILTER_SAMPLES - SIGNAL_CAPTURE) // 2
 FRAME = 116800
 PAYLOAD_BITS = 77
-SYNC_BY_PROFILE = {"wide": 1, "hf": 2}
-CFO_LIMIT_BY_PROFILE = {"wide": 750.0, "hf": 125.0}
+SYNC_BLIND = 1
+CFO_LIMIT_HZ = 125.0
 NOISE_LEVELS = (-24.0, -22.0, -20.0, -18.0, -16.0, -14.0)
+
+
+def record_run(args, started):
+    root = Path(__file__).resolve().parent.parent
+    source_paths = ["src/core/numerics.f90", "src/core/waveform_metrics.f90",
+                    "src/core/qra_soft.f90", "src/core/mfsk_iq.f90",
+                    "src/qf256_api.f90", "study/validate_acquisition.py"]
+    hashes = {path: hashlib.sha256((root / path).read_bytes()).hexdigest()
+              for path in source_paths}
+    output = Path(args.output)
+    metadata = {"completed_utc": datetime.now(timezone.utc).isoformat(),
+                "wall_seconds": time.time() - started, "receiver": "blind",
+                "cfo_limit_hz": CFO_LIMIT_HZ, "numpy_version": np.__version__,
+                "arguments": {key: value for key, value in vars(args).items() if key != "function"},
+                "source_sha256": hashes,
+                "library_sha256": hashlib.sha256(Path(args.lib).read_bytes()).hexdigest(),
+                "output_sha256": hashlib.sha256(output.read_bytes()).hexdigest()}
+    output.with_suffix(".json").write_text(json.dumps(metadata, indent=2) + "\n")
 
 
 class Result(C.Structure):
@@ -47,8 +67,7 @@ if C.sizeof(Result) != 152:
     raise RuntimeError(f"unexpected qf256_result size: {C.sizeof(Result)}")
 
 
-def init_worker(lib_path, cutoff_hz, capture_samples, profile,
-                frontend_offsets):
+def init_worker(lib_path, cutoff_hz, capture_samples, frontend_offsets):
     global tx, rx, lp_masks, sample_index, sync_mode, cfo_limit
     lib = C.CDLL(lib_path)
     tx = lib.qf256_tx_cf32
@@ -68,8 +87,8 @@ def init_worker(lib_path, cutoff_hz, capture_samples, profile,
         for offset in frontend_offsets
     }
     sample_index = np.arange(FRAME)
-    sync_mode = SYNC_BY_PROFILE[profile]
-    cfo_limit = CFO_LIMIT_BY_PROFILE[profile]
+    sync_mode = SYNC_BLIND
+    cfo_limit = CFO_LIMIT_HZ
 
 
 def call_rx(iq):
@@ -98,9 +117,9 @@ def noise_chunk(spec):
         seed = seed_base + index
         frontend_offset = frontend_offsets[index % len(frontend_offsets)]
         rng = np.random.default_rng(seed)
-        wide = sigma * (rng.standard_normal(NOISE_CAPTURE) +
+        unfiltered = sigma * (rng.standard_normal(NOISE_CAPTURE) +
                         1j * rng.standard_normal(NOISE_CAPTURE))
-        status, result = call_rx(ideal_frontend(wide, frontend_offset))
+        status, result = call_rx(ideal_frontend(unfiltered, frontend_offset))
         rows.append((index, snr_db, seed, status, int(result.crc_ok),
                      int(result.accepted), result.evidence,
                      result.noise_variance / FS / n0, result.start_samples,
@@ -146,11 +165,11 @@ def signal_chunk(spec):
         # Filter a longer continuous-noise context, then extract the receiver
         # capture. This keeps ideal-LP circular wrap 68,472 samples away from
         # both capture boundaries, including the exact start=8400 end corner.
-        wide = sigma * (rng.standard_normal(SIGNAL_FILTER_SAMPLES) +
+        unfiltered = sigma * (rng.standard_normal(SIGNAL_FILTER_SAMPLES) +
                         1j * rng.standard_normal(SIGNAL_FILTER_SAMPLES))
         first = SIGNAL_FILTER_PAD + start
-        wide[first:first + FRAME] += wave * rotation
-        filtered = ideal_frontend(wide, frontend_offset)
+        unfiltered[first:first + FRAME] += wave * rotation
+        filtered = ideal_frontend(unfiltered, frontend_offset)
         capture = filtered[SIGNAL_FILTER_PAD:
                            SIGNAL_FILTER_PAD + SIGNAL_CAPTURE]
         status, result = call_rx(capture)
@@ -175,7 +194,7 @@ def collect(pool, worker, specs, total):
 
 
 def run_noise(args):
-    if Path(args.output).exists():
+    if Path(args.output).exists() and not args.replace:
         raise FileExistsError(f"output already exists: {args.output}")
     frontend_offsets = tuple(args.frontend_offset)
     specs = [(first, min(first + args.chunk, args.count), args.seed_base,
@@ -184,21 +203,21 @@ def run_noise(args):
     started = time.time()
     with mp.get_context("fork").Pool(
             args.workers, initializer=init_worker,
-            initargs=(args.lib, args.cutoff, NOISE_CAPTURE, args.profile,
-                      frontend_offsets)) as pool:
+            initargs=(args.lib, args.cutoff, NOISE_CAPTURE, frontend_offsets)) as pool:
         rows = collect(pool, noise_chunk, specs, args.count)
-    with open(args.output, "x", newline="") as stream:
-        writer = csv.writer(stream)
+    with open(args.output, "w" if args.replace else "x", newline="") as stream:
+        writer = csv.writer(stream, lineterminator="\n")
         writer.writerow(("index", "snr_db", "seed", "status", "raw_crc",
                          "api_accepted", "evidence", "n0_ratio",
                          "start_samples", "cfo_hz", "iterations", "latency_ms",
                          "frontend_offset_hz"))
         writer.writerows(rows)
+    record_run(args, started)
     print(f"DONE {len(rows)} wall_s={time.time() - started:.3f}", flush=True)
 
 
 def run_signal(args):
-    if Path(args.output).exists():
+    if Path(args.output).exists() and not args.replace:
         raise FileExistsError(f"output already exists: {args.output}")
     specs = []
     frontend_offsets = tuple(args.frontend_offset)
@@ -212,17 +231,17 @@ def run_signal(args):
     started = time.time()
     with mp.get_context("fork").Pool(
             args.workers, initializer=init_worker,
-            initargs=(args.lib, args.cutoff, SIGNAL_FILTER_SAMPLES,
-                      args.profile, frontend_offsets)) as pool:
+            initargs=(args.lib, args.cutoff, SIGNAL_FILTER_SAMPLES, frontend_offsets)) as pool:
         rows = collect(pool, signal_chunk, specs, total)
-    with open(args.output, "x", newline="") as stream:
-        writer = csv.writer(stream)
+    with open(args.output, "w" if args.replace else "x", newline="") as stream:
+        writer = csv.writer(stream, lineterminator="\n")
         writer.writerow(("snr_db", "index", "seed", "true_start", "true_cfo",
                          "initial_phase", "tx_status", "rx_status", "raw_crc",
                          "payload_match", "api_accepted", "evidence", "n0_ratio",
                          "estimated_start", "estimated_cfo", "iterations", "latency_ms",
                          "frontend_offset_hz"))
         writer.writerows(rows)
+    record_run(args, started)
     print(f"DONE {len(rows)} wall_s={time.time() - started:.3f}", flush=True)
 
 
@@ -306,14 +325,14 @@ def summarize_signal(args):
 def add_run_options(parser, default_workers):
     parser.add_argument("--lib", default="lib/libqf256.so")
     parser.add_argument("--seed-base", type=int, required=True)
-    parser.add_argument("--cutoff", type=float, default=1850.0)
-    parser.add_argument("--profile", choices=tuple(SYNC_BY_PROFILE),
-                        default="wide")
+    parser.add_argument("--cutoff", type=float, default=1200.0)
     parser.add_argument("--frontend-offset", type=float, nargs="+",
-                        default=(0.0,))
+                        default=(-25.0, 25.0))
     parser.add_argument("--workers", type=int, default=default_workers)
     parser.add_argument("--chunk", type=int, default=32)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--replace", action="store_true",
+                        help="replace a complete output after all new calls finish")
 
 
 def main():
@@ -327,7 +346,7 @@ def main():
     add_run_options(signal, 8)
     signal.set_defaults(chunk=4)
     signal.add_argument("--count-per-level", type=int, default=128)
-    signal.add_argument("--snr", type=float, nargs="+", default=(-20.0, -18.0))
+    signal.add_argument("--snr", type=float, nargs="+", default=(-20.0, -18.0, -4.0))
     signal.set_defaults(function=run_signal)
     noise_summary = commands.add_parser("summarize-noise")
     noise_summary.add_argument("--input", required=True)

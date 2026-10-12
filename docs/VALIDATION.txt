@@ -1,57 +1,118 @@
-QF256 build, regression, and study verification
-Date: 2026-10-10
-Working directory: QF256 project root (.).
-Platform: Linux x86_64
-Toolchain: GNU Fortran and GCC (Debian 14.2.0-19) 14.2.0; GNU Make.
-Plot renderer: GNUplot 6.0 patchlevel 2, pdfcairo/pngcairo terminals.
+QF256 verification
+==================
 
-Default clean compilation:
-  make clean
-  make -j4 all bin/test_core bin/test_io bin/test_api bin/test_c_api tools
-Execution and regeneration:
-  make test examples-check
-  make test-c-api
-  make study-analysis
-  make snr-validation
-Strict clean compilation and verification:
+Receiver contract
+-----------------
+Sample rate: 12000 complex samples/s.
+Automatic acquisition: blind, starts 3600..8400 samples and CFO -125..125 Hz.
+Aligned-input test setting: known, start zero and residual CFO zero.
+Acceptance: raw FEC/CRC success and evidence >= 30.220758775848424.
+The gate is a fixed design constant, not estimated from the published trials.
+
+Reproduction
+------------
+Run from the repository root:
+
+  make -j4
+  make test test-c-api examples-check
   make strict
-Article:
+  make study-analysis
   make report
 
-The default and strict builds compile the three CLIs, static/shared libraries,
-core/I/O/Fortran/C tests, fixture utility, record analyzer, physical summarizer,
-and single-trial reproduction harness. The fixture utility is compiled but
-not run against the retained expected fixtures. Documented examples execute
-both IQ/WAV paths with known and blind synchronization.
+The strict target rebuilds the modem, tests, and study analyzers with Fortran
+and C warnings treated as errors, runs regressions and examples, and
+regenerates study summaries. It does not clear campaign directories.
+The study-analysis target reads published records; it does not rerun channel
+trials. Full campaign commands and seed formulas are in study/README.md and
+study/MODEL.md. Build logs are local generated artifacts, not measurement data.
 
-Results:
-  Compiler warnings: 0. Compiler errors: 0.
-  Strict Fortran and C flags include -Wall -Wextra -Werror.
-  88 core checks, 26 I/O checks, and 39 CLI checks passed.
-  Fortran API validation and known-sync roundtrip passed.
-  C ABI layout, validation, SNR, known-sync and blind-sync roundtrips passed.
-  Four documented IQ/WAV example receive cases passed.
-  Raw CF32 frame hash, exact WAV bytes, and all fixture checksums matched.
-  Analysis validated all 3072 signal and 6144 noise records.
-  Physical analysis validated 3072 records and summarized 1536 unique cases.
-  Regenerated numerical CSV tables/CDFs match the retained output hashes.
-  Study targets recompute statistics from the included measurement records.
-  Fixed-seed SNR validation used 128 cases per point. AWGN bias was
-  -0.080..-0.023 dB with RMSE 0.234..0.892 dB over -24..-14 dB. Moderate
-  fading bias was -0.166/-0.250/-0.226 dB with RMSE 0.925/1.029/1.002 dB;
-  hard fading bias was -0.764/-0.963/-1.009 dB with RMSE
-  1.049/1.318/1.270 dB at -18/-16/-14 dB.
+Software checks
+---------------
+The current regression run passed 138 core checks, 26 file-I/O checks,
+40 CLI checks, and 34 channel/frontend checks, plus Fortran/C API and the
+four documented IQ/WAV roundtrips. These assertion counts are separate
+from the channel-trial denominators. Tests cover the full-frame CF32 and
+PCM fixtures, public input bounds, automatic acquisition, aligned-input
+decoding, the C result layout, and noise/SNR fields.
 
-Complete logs:
-  BUILD.log, TEST.log, TEST-C-API.log, STRICT-BUILD.log,
-  STUDY-BUILD.log, STUDY-REGENERATION.log, REPORT-BUILD.log.
-Local project and toolchain prefixes in these distribution logs are replaced
-with <project-root> and <tex-install>; commands and diagnostics are preserved.
-Analysis details: ../study/ANALYSIS.log and ../study/RESULTS.txt.
-Runtime dependencies: RUNTIME-DEPS.txt. CLI help: CLI-HELP.txt.
-Source integrity: CORE.sha256 and CORE-STATEMENTS.txt.
-Data and source consistency checks: AUDIT.txt.
+The Python standard-library checks passed: 15 signal/noise-record and
+statistical/energy checks, nine physical-record tests, and 12 campaign-runner
+tests. They cover complete and duplicate grids, seed formulas, power-setting
+pairing, fixed gate consistency, nonfinite records, source/build identity,
+and resumed trial validation. These 36 tests are not additional channel trials.
+Python 3 is required for make test/strict; NumPy is required only by the
+acquisition campaign, not those ordinary regression tests.
 
-Article toolchain: pdfTeX 1.40.29 / TeX Live 2026. Output: 14 A4 pages.
-The final LaTeX pass contains no errors, warnings, overfull boxes or underfull
-boxes.
+Verified commands and environment
+---------------------------------
+make strict completed with exit status zero. It rebuilt all requested
+targets with -Werror, passed the checks listed above, and regenerated the
+statistical tables, physical summaries and GNUplot figures from the final
+ITU-profile records. Source, executable, compiler and campaign-design
+identities still matched after the rebuild. The core hash check and all
+10 DATA.sha256 and 11 PHYSICAL.sha256 entries passed.
+
+The execution environment used GNU Fortran and the GNU C compiler
+14.2.0 (Debian 14.2.0-19), Python 3.13.5, NumPy 2.2.4, GNUplot 6.0 patchlevel 2,
+and pdfTeX 1.40.29 (TeX Live 2026). The Fortran campaign uses -O3 without
+fast-math; exact build commands and executable identities are recorded in
+study/CAMPAIGN.json. Statistical-record checks do not rerun the channel
+simulation. The separate SNR replay and PDF build are distinct checks.
+
+The final PDF build completed with 17 pages and no compiler warnings,
+undefined references, overfull boxes or underfull boxes. Every rendered
+page (1..17) passed visual review for clipping, overlap and legibility.
+An independent comparison of the LaTeX tables and numerical narrative
+against the promoted CSVs found no discrepancies in cell counts,
+crossings, SNR estimates, noise/acquisition outcomes, waveform measurements,
+profile parameters or seed formulas.
+
+make snr-validation completed with exit status zero. It reexecuted all
+1920 estimator cases sequentially; cmp confirmed byte-for-byte agreement
+with the 15 published rows generated by the parallel campaign.
+
+Study design
+------------
+The principal campaign evaluates the quiet, moderate and disturbed
+mid-latitude two-path profiles specified by ITU-R F.1487-0, Annex 3,
+sections 3.1-3.3, six transmit-reference SNR levels, and two paired power
+settings, with 128 cases per cell. Its 36 cells contain 4608 records for
+2304 randomized cases. Profile selection does not imply compliance with
+the recommendation's complete BER and test-duration procedure; each fade
+uses 64 spectral lines.
+All 77 payload bits are sampled. Signal and noise pass together through
+an ideal 300..2700 Hz frontend centered at 1500 Hz. Individual fades are
+not power-normalized. Main-study CFO is sampled over -2..2 Hz; acquisition
+boundaries are covered by a separate AWGN geometry experiment.
+
+The 2048-capture noise diagnostic lot does not set the gate. A separately
+seeded 4096-capture check provides the principal noise-only acceptance
+measurement. The geometry experiment uses 384 signal captures and 4096
+noise captures through the two limiting 1475/1525 Hz frontend centers.
+The two noise checks concern different input ensembles and are not pooled.
+
+Per-trial outcomes, statistical intervals, and waveform summaries are in
+study/. The technical report specifies their interpretation and limitations.
+The receiver SNR check has 15 rows of 128 attempted estimates: six AWGN
+levels and three levels for each fading profile, or 1920 attempts. It uses
+known aligned tones in AWGN and correct accepted messages in fading;
+these differently conditioned populations are reported separately.
+None of these software or simulated-channel checks guarantees
+an on-air decoding probability, practical filter response, or immunity to
+unmodeled interference.
+
+Integrity
+---------
+Before regenerating published artifacts:
+
+  sha256sum -c docs/DELIVERY.sha256
+  sha256sum -c docs/CORE.sha256
+  sha256sum -c study/DATA.sha256
+  sha256sum -c study/PHYSICAL.sha256
+
+The delivery manifest covers the distribution except itself. The core
+manifest identifies the numerical implementation. Study manifests identify
+the input records and physical measurements used by the analysis.
+Acquisition CSVs include CPU latency; their hashes identify the published
+execution, not an exact replay promise. Compare deterministic decode fields
+without latency when rerunning that experiment.

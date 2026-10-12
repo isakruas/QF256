@@ -1,111 +1,204 @@
 \section{Results}
 \label{sec:results}
 
+\input{study/publication-cells.tex}
 \subsection{Correct-message acceptance and erasures}
 
-Figure~\ref{fig:acceptance} and Table~\ref{tab:cells} report every
-confirmation cell. Under unit-average power, the equal-weight grid summary
-is 784 correct acceptances in 1536 records (51.0\%); under unit-peak power,
-it is 686/1536 (44.7\%). The profile totals are 414/768 and 370/768 for
-moderate and hard fading at unit-average power, and 367/768 and 319/768 at
-unit-peak power. These fractions summarize this deliberately balanced SNR
-grid, rather than an operating distribution of HF conditions.
+Figure~\ref{fig:acceptance} and
+Tables~\ref{tab:cells-average} and \ref{tab:cells-peak} separate the two
+power constraints while retaining all three profiles and six reference
+levels. Their confidence intervals are pointwise, not simultaneous bands.
+The equal-weight grid summary has 1232 correct acceptances in 2304 records
+(53.5\%) under unit-average power and 1088/2304 (47.2\%) under unit-peak
+power. For quiet, moderate and disturbed respectively, the unit-average
+totals are 407/768, 417/768 and 408/768; the unit-peak totals are 365/768,
+364/768 and 359/768. These fractions summarize the deliberately balanced
+grid, not an operating distribution of HF conditions.
 
-\begin{figure}[ht]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{study/figures/acceptance.pdf}
 \caption{Correct-message acceptance with pointwise 95\% Wilson intervals;
-128 frames per point. Lines connect the measured points. The horizontal
-axis is the unit-reference level $\rho$. In (a) it equals average transmit
-SNR in 2500\,Hz; in (b) average transmit SNR is approximately 0.711\,dB lower.
+128 frames per point. Lines connect measured points. In (a), the reference
+level $\rho$ equals average transmit SNR in 2500\,Hz. In (b), average
+transmit SNR is approximately 0.711\,dB lower because of peak normalization.
 The two panels reuse the same randomized cases.}
 \label{fig:acceptance}
 \end{figure}
 
-\begin{table}[ht]
+\begin{table}[htbp]
 \centering\small
-\input{study/publication-cells.tex}
-\caption{Correct acceptances and pointwise 95\% Wilson intervals.
-Every cell has zero incorrect acceptances; its erasure count is $128-k$.
-Rates are dimensionless. Full erasure and incorrect-acceptance intervals
-are supplied in \texttt{study/cells.csv}.}
-\label{tab:cells}
+\QFcellsAverage
+\caption{Unit-average power: correct acceptances and pointwise 95\% Wilson
+intervals, with 128 frames per cell. The reference level $\rho$ equals
+average transmit SNR in 2500\,Hz. Erasure and incorrect-acceptance counts
+and intervals are supplied separately in \texttt{study/cells.csv}.}
+\label{tab:cells-average}
 \end{table}
 
-At $-24\dB$, none of the four conditions accepts a correct message. At
-$-14\dB$, every condition accepts all 128 messages; the Wilson interval
-for each 128/128 cell is approximately $[0.971,1]$, so the observation does
-not establish error-free operation. The transition between these limits
-is resolved only at 2\,dB increments. No incorrect accepted message occurs
-in any of the 3072 signal records; all remaining outcomes are erasures.
-Because the power settings are paired, those records do not constitute
-3072 independent opportunities for an undetected error.
+\begin{table}[htbp]
+\centering\small
+\QFcellsPeak
+\caption{Unit-peak power: correct acceptances and pointwise 95\% Wilson
+intervals, with 128 frames per cell. The reference level $\rho$ uses
+unit power; actual average transmit SNR follows \eqref{eq:physicalsnr}.
+These cases share payload, channel and noise draws with
+Table~\ref{tab:cells-average}; they are not independent repetitions.}
+\label{tab:cells-peak}
+\end{table}
+
+At $-24\dB$, quiet fading under unit-average power has two correct
+acceptances; the other five conditions have none. At $-14\dB$, five
+conditions accept all 128 messages and quiet fading under unit-peak power
+accepts 125/128. Even a 128/128 cell has a Wilson interval of approximately
+$[0.971,1]$, not proof of error-free operation. No incorrect message is
+accepted in any of the 4608 signal records; the other outcomes are erasures.
+Because the power settings are paired, these are not 4608 independent
+opportunities for an undetected error.
 
 \subsection{The 50\% acceptance crossing}
 
-\begin{table}[ht]
+\begin{table}[htbp]
 \centering\small
 \input{study/publication-thresholds.tex}
 \caption{Interpolated 50\% crossing in reference-level dB and conservative
-95\% grid brackets under a monotone-response assumption. The bracket is
-constructed from six simultaneous exact binomial intervals per curve.
-Its width reflects sampling uncertainty and grid resolution.}
+95\% grid brackets under a monotone-response assumption. Each bracket
+uses six simultaneous exact binomial intervals for its own curve;
+coverage is not joint across the six curves.}
 \label{tab:thresholds}
 \end{table}
 
-Table~\ref{tab:thresholds} places the unit-average crossings near $-19.4$
-and $-18.8\dB$. Both lie between the measured $-20$ and $-18\dB$ points.
-The moderate unit-peak crossing is also in that interval. For hard fading
-at unit-peak power, 60/128 messages succeed at $-18\dB$, giving an
-interpolated crossing near $-17.9\dB$ between $-18$ and $-16\dB$.
-Its conservative uncertainty bracket spans $[-20,-16]\dB$ because the
-$-18\dB$ cell does not locate the true success probability securely on
-either side of 0.5. Sub-decibel interpolated values describe the chosen
-interpolation and should not be read as sub-decibel measurement resolution.
+All six crossings interpolate between the measured $-20$ and $-18\dB$
+points. At unit-average power they are approximately $-19.3$, $-19.5$
+and $-19.3\dB$ for quiet, moderate and disturbed. All three unit-peak
+values round to $-18.7\dB$. The quiet unit-average grid bracket is
+$[-22,-18]\dB$; the other five are $[-20,-18]\dB$.
+These overlapping brackets and the 2\,dB measurement spacing do not
+support a ranking based on the small interpolated differences.
+
+The observed curves also change order across the grid. For example,
+unit-average quiet and disturbed have 24 and 4 correct acceptances at
+$-22\dB$, but 91 and 114 at $-18\dB$. The ITU profile names identify
+delay/Doppler parameters rather than a universal ordering of this receiver's
+frame-acceptance probability. The experiment changes both parameters and
+does not isolate a cause for the observed differences.
 
 \subsection{Noise-only acceptance}
 
-\begin{table}[ht]
+\begin{table}[htbp]
 \centering
 \begin{tabular}{@{}lrrrr@{}}
 \toprule
 Lot & Captures & Raw FEC accepts & Final accepts & Gate exceedances \\
 \midrule
-Calibration & 2048 & 0 & 0 & 21 \\
-Independent check & 4096 & 0 & 0 & 44 \\
+Diagnostic & 2048 & 0 & 0 & 3 \\
+Independent check & 4096 & 0 & 0 & 4 \\
 \bottomrule
 \end{tabular}
-\caption{Noise-only outcomes. Gate exceedance alone is not acceptance;
-the receiver also requires raw decoder success.}
+\caption{Noise-only outcomes. Evidence-gate exceedance alone is not
+acceptance; the receiver also requires raw decoder success.}
 \label{tab:noise}
 \end{table}
 
 The independently seeded check has zero false accepts in 4096 captures,
-giving the upper bound in \eqref{eq:falsebound}, or about 0.0731\% per
-15-second capture. The reference scales have counts 683, 683, 683, 683,
-682, and 682 in increasing $\rho$ order. The pooled bound does not supply
-a separate 95\% upper limit of the same size at each scale. Both lots also
-have zero raw FEC acceptances, so the evidence-only exceedances in
-Table~\ref{tab:noise} must not be reported as false decoded messages.
+giving the upper bound in \eqref{eq:falsebound}, about 0.0731\% per
+15-second capture. The six reference scales have counts 683, 683, 683,
+683, 682 and 682 in increasing $\rho$ order. The pooled bound does not
+provide an equally small 95\% upper limit at each scale. Neither lot
+has any raw FEC acceptance, so these records do not measure an observed
+reduction caused by gating. The diagnostic evidence 99th percentile is
+26.4951, below the fixed gate $\Gate$; this descriptive quantile does not
+set or recalibrate the gate.
+
+\subsection{Acquisition-boundary checks}
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{@{}rrrrr@{}}
+\toprule
+SNR (dB) & Cases & Raw correct & Accepted correct & Exact corners \\
+\midrule
+$-20$ & 128 & 116 & 115 & 8/8 \\
+$-18$ & 128 & 128 & 128 & 8/8 \\
+$-4$ & 128 & 128 & 128 & 8/8 \\
+\bottomrule
+\end{tabular}
+\caption{Independent AWGN acquisition checks over the complete timing/CFO
+interval and the two limiting frontend centers. Exact corners count
+correct messages that also pass the fixed gate.}
+\label{tab:acquisition}
+\end{table}
+
+All 24 sampled exact Cartesian corners succeed. At $-20\dB$, one raw
+correct decode is rejected by the evidence gate; the other unsuccessful
+cases are raw-decoder failures. No incorrect message is accepted. These
+results exercise the stated ideal-frontend geometry, not every possible
+noise or fading realization at a boundary.
+
+The separate noise check with alternating frontend centers has zero raw
+and zero accepted decodes in 4096 captures, with two evidence-gate
+exceedances. Its own one-sided 95\% upper acceptance bound is
+$7.31\times10^{-4}$ per capture. It is not pooled with the centered
+frontend check in Table~\ref{tab:noise}, because the input ensembles differ.
+
+\subsection{SNR-estimation error}
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Channel & Target (dB) & Valid / 128 & Bias (dB) & RMSE (dB) \\
+\midrule
+AWGN & $-24$ & 128 & $-0.1459$ & 0.8357 \\
+AWGN & $-22$ & 128 & $-0.0888$ & 0.7604 \\
+AWGN & $-20$ & 128 & $-0.0825$ & 0.5045 \\
+AWGN & $-18$ & 128 & $-0.0348$ & 0.3745 \\
+AWGN & $-16$ & 128 & $-0.0315$ & 0.3179 \\
+AWGN & $-14$ & 128 & $-0.0486$ & 0.2181 \\
+\midrule
+Quiet & $-18$ & 93 & $0.0190$ & 1.2872 \\
+Quiet & $-16$ & 123 & $-0.3666$ & 2.0109 \\
+Quiet & $-14$ & 124 & $-0.5810$ & 1.9426 \\
+Moderate & $-18$ & 108 & $-0.0323$ & 0.9035 \\
+Moderate & $-16$ & 125 & $-0.1543$ & 1.0760 \\
+Moderate & $-14$ & 128 & $-0.3811$ & 1.3388 \\
+Disturbed & $-18$ & 111 & $-0.1535$ & 0.8194 \\
+Disturbed & $-16$ & 128 & $-0.2745$ & 1.0306 \\
+Disturbed & $-14$ & 128 & $-0.2657$ & 0.9624 \\
+\bottomrule
+\end{tabular}
+\caption{SNR error relative to the configured transmit-reference level.
+AWGN uses known aligned tones; fading rows include only correct accepted
+decodes with valid estimates. All use the centered ideal frontend.}
+\label{tab:snrvalidation}
+\end{table}
+
+Bias is mean estimated SNR minus the configured value; RMSE is the root
+mean squared difference. In the unconditional AWGN rows, bias ranges from
+$-0.1459$ to $-0.0315\dB$ and RMSE from 0.2181 to 0.8357\,dB.
+The fading rows are conditioned on successful reception and include
+realized receive-power fluctuations relative to transmit-reference SNR.
+Their biases range from $-0.5810$ to $0.0190\dB$ and RMSE from 0.8194
+to 2.0109\,dB. The valid-case counts are therefore essential to interpreting
+these figures. No empirical bias correction is fitted.
 
 \subsection{Waveform duration, bandwidth, and peak power}
 
 The active waveform has exactly 116,800 samples at 12\,kHz, including both
 filter tails, for a duration of 9.733333333\,s. The physical summary uses
-1536 unique confirmation waveforms once each; duplicated records from the
-two power settings do not enlarge the waveform sample. Mean $B_{99}$ is
-1958.731\,Hz and the largest observed value is 1998.724\,Hz. Mean PAPR is
-0.710905\,dB and the largest observed value is 0.710951\,dB. These extrema
-belong to the sampled payloads, not to an exhaustive search of the codebook.
-The nearly fixed envelope peak makes unit-peak active-frame average power
-approximately 0.8490 and energy approximately 8.2636 in normalized
-power-seconds, compared with 1 and 9.7333 under unit-average normalization.
+2304 distinct randomized source cases, counted once each despite the
+paired power records. Mean $B_{99}$ is 1959.236\,Hz and the largest
+observed value is 1998.225\,Hz. Mean PAPR is 0.710906\,dB and the largest
+observed value is 0.710965\,dB. These extrema belong to the sampled payloads,
+not to an exhaustive search over the codebook. Unit-peak active-frame mean
+power is approximately 0.8490 and energy 8.2636 in normalized power-seconds,
+compared with 1 and 9.7333 under unit-average normalization.
 
-\begin{figure}[ht]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{study/figures/physical.pdf}
-\caption{Empirical cumulative distributions of the measured waveform
-bandwidth and PAPR over 1536 unique confirmation cases. No channel fading
-or noise enters these transmit-waveform measurements.}
+\caption{Empirical cumulative distributions of transmit-waveform bandwidth
+and PAPR over 2304 randomized source cases, without counting the paired
+power settings twice. Channel fading and noise do not enter these measures.}
 \label{fig:physical}
 \end{figure}

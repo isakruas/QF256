@@ -3,14 +3,13 @@
 module mfsk_iq_mod
   use numerics_mod, only: dp,PI
   use qra_soft_mod, only: qra_config,qra_setup,qra_encode,qra_metric,qra_decode
-  use v2metrics_mod, only: fft_forward
+  use waveform_metrics_mod, only: fft_forward
   use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
   implicit none
   private
   public :: sc_config,sc_result,setup_sc,sc_tx,sc_rx,sc_peak_reference
   public :: mfsk_statistics,estimate_n0,estimate_tone_n0,estimate_snr_2500,mfsk_filtered_waveform
-  real(dp),parameter,public :: blind_cfo_limit_hz=750.0_dp
-  real(dp),parameter,public :: blind_hf_cfo_limit_hz=125.0_dp
+  real(dp),parameter,public :: blind_cfo_limit_hz=125.0_dp
   type sc_config
     integer :: id=5,nsym=76,ndata=60,npilot=16,n,ns,ntaps,half
     real(dp) :: fs,duration,ts=0.128_dp,spacing=7.8125_dp,lowpass_hz=2000.0_dp
@@ -256,7 +255,7 @@ contains
     lo=nint(.3_dp*cfg%fs);hi=nint(.7_dp*cfg%fs)
     ! Search a fixed complex-baseband interval, independent of RF tuning.
     ! A tone-spacing/2 first grid bounds coherent loss, then two local grids
-    ! recover the original final frequency and timing resolution without
+    ! recover the target frequency and timing resolution without
     ! evaluating every fine hypothesis across the complete interval.
     coarse_step=cfg%spacing/2
     middle_step=cfg%spacing/32
@@ -359,12 +358,10 @@ contains
     allocate(energy(0:255,60),probability(0:255,60))
     if(sync=='blind')then
       call acquire(iq,cfg,blind_cfo_limit_hz,result%start,result%cfo,score)
-    else if(sync=='blind-hf')then
-      call acquire(iq,cfg,blind_hf_cfo_limit_hz,result%start,result%cfo,score)
     else if(sync=='known')then
       call search_sync(iq,cfg,0,0,1,0.0_dp,0.0_dp,1.0_dp,result%start,result%cfo,score)
     else
-      error stop 'MFSK synchronization must be known, blind or blind-hf'
+      error stop 'MFSK synchronization must be known or blind'
     end if
     call mfsk_statistics(iq,cfg,result%start,result%cfo,energy)
     tone_n0=estimate_tone_n0(energy);n0=guard_n0

@@ -9,14 +9,11 @@ CFLAGS ?= -std=c11 -O2 -Wall -Wextra
 MOD = -Jbuild/mod -Ibuild/mod
 CORE = build/numerics.o build/waveform_metrics.o build/qra_soft.o build/mfsk_iq.o
 LIBOBJ = $(CORE) build/qf256_api.o build/qf256_io.o
-WIDE_VALIDATION_DIR ?= study/build/wide-acquisition
-WIDE_VALIDATION_WORKERS ?= 4
-WIDE_GATE = 30.220758775848424
-WIDE_CUTOFF = 1850
-HF_VALIDATION_DIR ?= study/build/hf-acquisition
-HF_VALIDATION_WORKERS ?= 4
-HF_CUTOFF = 1200
-.PHONY: all clean test test-c-api core-check report strict tools study-analysis snr-validation examples-check wide-validation wide-validation-cal wide-validation-check wide-validation-signals wide-validation-summary hf-validation hf-validation-check hf-validation-signals hf-validation-summary
+STUDY_WORKERS ?= 8
+STUDY_RUN_DIR ?= study/build/campaign
+ACQUISITION_DIR ?= study/acquisition
+ACCEPTANCE_GATE = 30.220758775848424
+.PHONY: all clean test test-c-api core-check report strict tools study-tools study study-campaign study-analysis study-evidence snr-validation examples-check acquisition-validation
 all: bin/qf256 bin/qf256-tx bin/qf256-rx lib/libqf256.a lib/libqf256.so
 build/mod bin lib:
 	mkdir -p $@
@@ -54,58 +51,68 @@ bin/test_c_api: tests/test_qf256_api_c.c include/qf256.h lib/libqf256.so | bin
 	$(CC) $(CFLAGS) -Iinclude $< -Llib -lqf256 -Wl,-rpath,'$$ORIGIN/../lib' -lm -o $@
 bin/create_fixtures: tests/create_fixtures.f90 $(CORE) | bin
 	$(FC) $(FFLAGS) $(MOD) $< $(CORE) -o $@
-tools: bin/create_fixtures
-	$(MAKE) -C study all
-	$(MAKE) -f study/Makefile.reproduce all
-study-analysis: tools
-	$(MAKE) -C study analysis
-	$(MAKE) -f study/Makefile.reproduce physical-summary
+STUDY_FLAGS = -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -Werror
+STUDY_CORE = src/core/numerics.f90 src/core/waveform_metrics.f90 src/core/qra_soft.f90 src/core/mfsk_iq.f90 src/qf256_api.f90
+STUDY_CHANNEL = study/channel.f90 study/frontend.f90
+study/build/reproduce: $(STUDY_CORE) $(STUDY_CHANNEL) study/reproduce.f90
+	mkdir -p study/build/reproduce-mod
+	$(FC) $(STUDY_FLAGS) -Jstudy/build/reproduce-mod -Istudy/build/reproduce-mod $^ -o $@
+study/build/validate_snr: $(STUDY_CORE) $(STUDY_CHANNEL) study/validate_snr.f90
+	mkdir -p study/build/snr-mod
+	$(FC) $(STUDY_FLAGS) -Jstudy/build/snr-mod -Istudy/build/snr-mod $^ -o $@
+study/build/analyze: study/analyze.f90
+	mkdir -p study/build/analysis-mod
+	$(FC) $(STUDY_FLAGS) -fcheck=all -Jstudy/build/analysis-mod $< -o $@
+study/build/summarize_physical: study/summarize_physical.f90
+	mkdir -p study/build
+	$(FC) $(STUDY_FLAGS) -fcheck=all $< -o $@
+bin/test_channel: src/core/numerics.f90 src/core/waveform_metrics.f90 $(STUDY_CHANNEL) tests/test_channel.f90 | bin
+	mkdir -p build/channel-mod
+	$(FC) $(STUDY_FLAGS) -fcheck=all -Jbuild/channel-mod -Ibuild/channel-mod $^ -o $@
+tools: bin/create_fixtures study-tools
+study-tools: study/build/reproduce study/build/validate_snr study/build/analyze study/build/summarize_physical
+study-analysis: study/build/analyze study/build/summarize_physical
+	./study/build/analyze summarize study
+	./study/build/summarize_physical
 	$(GNUPLOT) study/plots.gp
-snr-validation: tools
-	$(MAKE) -f study/Makefile.reproduce snr-validation
-$(WIDE_VALIDATION_DIR):
+study-campaign: study-tools
+	OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 $(PYTHON) study/run_campaign.py --workers $(STUDY_WORKERS) --output $(STUDY_RUN_DIR)
+	$(MAKE) study-analysis
+snr-validation: study/build/validate_snr
+	./study/build/validate_snr > study/build/SNR_VALIDATION.csv
+	cmp study/SNR_VALIDATION.csv study/build/SNR_VALIDATION.csv
+	cat study/build/SNR_VALIDATION.csv
+$(ACQUISITION_DIR):
 	mkdir -p $@
-$(WIDE_VALIDATION_DIR)/noise-cal.csv: study/validate_wide_acquisition.py lib/libqf256.so | $(WIDE_VALIDATION_DIR)
-	OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 $(PYTHON) $< noise --lib lib/libqf256.so --count 2048 --seed-base 6066101100 --cutoff $(WIDE_CUTOFF) --workers $(WIDE_VALIDATION_WORKERS) --output $@
-$(WIDE_VALIDATION_DIR)/noise-check.csv: study/validate_wide_acquisition.py lib/libqf256.so | $(WIDE_VALIDATION_DIR)
-	OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 $(PYTHON) $< noise --lib lib/libqf256.so --count 4096 --seed-base 7076101100 --cutoff $(WIDE_CUTOFF) --workers $(WIDE_VALIDATION_WORKERS) --output $@
-$(WIDE_VALIDATION_DIR)/signals.csv: study/validate_wide_acquisition.py lib/libqf256.so | $(WIDE_VALIDATION_DIR)
-	OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 $(PYTHON) $< signal --lib lib/libqf256.so --count-per-level 128 --snr -20 -18 --seed-base 8086101100 --cutoff $(WIDE_CUTOFF) --workers $(WIDE_VALIDATION_WORKERS) --chunk 4 --output $@
-wide-validation-cal: $(WIDE_VALIDATION_DIR)/noise-cal.csv
-wide-validation-check: $(WIDE_VALIDATION_DIR)/noise-check.csv
-wide-validation-signals: $(WIDE_VALIDATION_DIR)/signals.csv
-wide-validation-summary: wide-validation-cal wide-validation-check wide-validation-signals
-	$(PYTHON) study/validate_wide_acquisition.py summarize-noise --input $(WIDE_VALIDATION_DIR)/noise-cal.csv --gate $(WIDE_GATE)
-	$(PYTHON) study/validate_wide_acquisition.py summarize-noise --input $(WIDE_VALIDATION_DIR)/noise-check.csv --gate $(WIDE_GATE)
-	$(PYTHON) study/validate_wide_acquisition.py summarize-signal --input $(WIDE_VALIDATION_DIR)/signals.csv --gate $(WIDE_GATE)
-wide-validation: wide-validation-summary
-$(HF_VALIDATION_DIR):
-	mkdir -p $@
-$(HF_VALIDATION_DIR)/noise-check.csv: study/validate_wide_acquisition.py lib/libqf256.so | $(HF_VALIDATION_DIR)
-	OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 $(PYTHON) $< noise --lib lib/libqf256.so --profile hf --count 4096 --seed-base 9096101100 --cutoff $(HF_CUTOFF) --frontend-offset -25 25 --workers $(HF_VALIDATION_WORKERS) --output $@
-$(HF_VALIDATION_DIR)/signals.csv: study/validate_wide_acquisition.py lib/libqf256.so | $(HF_VALIDATION_DIR)
-	OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 $(PYTHON) $< signal --lib lib/libqf256.so --profile hf --count-per-level 128 --snr -20 -18 -4 --seed-base 9097101100 --cutoff $(HF_CUTOFF) --frontend-offset -25 25 --workers $(HF_VALIDATION_WORKERS) --chunk 4 --output $@
-hf-validation-check: $(HF_VALIDATION_DIR)/noise-check.csv
-hf-validation-signals: $(HF_VALIDATION_DIR)/signals.csv
-hf-validation-summary: hf-validation-check hf-validation-signals
-	$(PYTHON) study/validate_wide_acquisition.py summarize-noise --input $(HF_VALIDATION_DIR)/noise-check.csv --gate $(WIDE_GATE)
-	$(PYTHON) study/validate_wide_acquisition.py summarize-signal --input $(HF_VALIDATION_DIR)/signals.csv --gate $(WIDE_GATE)
-hf-validation: hf-validation-summary
+$(ACQUISITION_DIR)/noise.csv: study/validate_acquisition.py lib/libqf256.so | $(ACQUISITION_DIR)
+	OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 $(PYTHON) $< noise --lib lib/libqf256.so --count 4096 --seed-base 9106101100 --workers $(STUDY_WORKERS) --replace --output $@
+$(ACQUISITION_DIR)/signals.csv: study/validate_acquisition.py lib/libqf256.so | $(ACQUISITION_DIR)
+	OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 $(PYTHON) $< signal --lib lib/libqf256.so --count-per-level 128 --snr -20 -18 -4 --seed-base 9107101100 --workers $(STUDY_WORKERS) --chunk 4 --replace --output $@
+acquisition-validation: $(ACQUISITION_DIR)/noise.csv $(ACQUISITION_DIR)/signals.csv
+	$(PYTHON) study/validate_acquisition.py summarize-noise --input $(ACQUISITION_DIR)/noise.csv --gate $(ACCEPTANCE_GATE)
+	$(PYTHON) study/validate_acquisition.py summarize-signal --input $(ACQUISITION_DIR)/signals.csv --gate $(ACCEPTANCE_GATE)
+study: study-campaign
+	$(MAKE) acquisition-validation
+	$(MAKE) study-evidence
+study-evidence:
+	$(PYTHON) study/finalize.py
 examples-check: all
 	bash tests/check_examples.sh
 core-check:
-	sha256sum -c docs/RUNTIME-CORE.sha256
-test: all bin/test_core bin/test_api bin/test_io core-check
+	sha256sum -c docs/CORE.sha256
+test: all bin/test_core bin/test_api bin/test_io bin/test_channel study/build/analyze study/build/summarize_physical core-check
 	./bin/test_core
 	./bin/test_api
+	./bin/test_channel
+	$(PYTHON) tests/test_study.py
+	$(PYTHON) tests/test_campaign.py
 	mkdir -p build/test/io
 	./bin/test_io
 	bash tests/check_cli.sh
 test-c-api: all bin/test_c_api
 	./bin/test_c_api
 strict:
-	$(MAKE) clean
-	$(MAKE) FFLAGS="$(FFLAGS) -Werror" CFLAGS="$(CFLAGS) -Werror" all test test-c-api examples-check study-analysis
+	$(MAKE) --always-make FFLAGS="$(FFLAGS) -Werror" CFLAGS="$(CFLAGS) -Werror" all test test-c-api examples-check study-analysis
 report: docs/report/qf256-report.pdf
 docs/report/qf256-report.pdf: docs/report/qf256-report.tex docs/report/study-methods.tex docs/report/study-results.tex study/publication-cells.tex study/publication-thresholds.tex study/figures/acceptance.pdf study/figures/physical.pdf
 	$(PDFLATEX) -interaction=nonstopmode -halt-on-error -file-line-error -output-directory=docs/report $<

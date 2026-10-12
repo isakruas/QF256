@@ -10,8 +10,8 @@ program test_qf256_api
   logical :: accepted
   character(160) :: message
   if(qf256_api_version/=1.or.qf256_snr_reference_hz/=2500.0_real64.or. &
-    qf256_blind_cfo_limit_hz/=750.0_real64.or.qf256_blind_hf_cfo_limit_hz/=125.0_real64.or. &
-    qf256_sync_blind_hf/=2.or.qf256_gate/=30.220758775848424_real64) &
+    qf256_blind_cfo_limit_hz/=125.0_real64.or.qf256_sync_known/=0.or.qf256_sync_blind/=1.or. &
+    qf256_gate/=30.220758775848424_real64) &
     error stop 'Unexpected public API constants'
   do i=1,77
     bits(i)=modulo(i*17+i/3,2)
@@ -29,9 +29,11 @@ program test_qf256_api
   do i=1,size(iq)
     capture(6000+i)=iq(i)*exp(cmplx(0.0_real64,2*acos(-1.0_real64)*125.0_real64*(i-1)/qf256_sample_rate,real64))
   end do
+  call qf256_decode(capture,'blind',result,accepted,status,message)
+  if(status/=qf256_ok.or..not.accepted.or.any(result%payload/=bits))error stop 'Blind roundtrip failed'
+  if(abs(result%start-6000)>12.or.abs(result%cfo-125.0_real64)>.1_real64)error stop 'Blind acquisition mismatch'
   call qf256_decode(capture,'blind-hf',result,accepted,status,message)
-  if(status/=qf256_ok.or..not.accepted.or.any(result%payload/=bits))error stop 'Blind-HF roundtrip failed'
-  if(abs(result%start-6000)>12.or.abs(result%cfo-125.0_real64)>.1_real64)error stop 'Blind-HF acquisition mismatch'
+  if(status/=qf256_invalid_sync.or.accepted)error stop 'Removed blind-hf synchronization accepted'
   deallocate(capture)
   call qf256_decode(iq,'invalid',result,accepted,status,message)
   if(status/=qf256_invalid_sync.or.accepted)error stop 'Invalid synchronization accepted'
@@ -52,5 +54,5 @@ program test_qf256_api
   bits(1)=2
   call qf256_encode(bits,iq,status,message)
   if(status/=qf256_invalid_bits.or.allocated(iq))error stop 'Out-of-range bit accepted'
-  print '(A)','PASS: Fortran API validation and known/blind-HF roundtrips'
+  print '(A)','PASS: Fortran API validation and known/blind roundtrips'
 end program test_qf256_api

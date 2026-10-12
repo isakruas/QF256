@@ -1,8 +1,10 @@
 channel,power_constraint,records,correct_accepted,missed,accepted_wrong,correct_fraction,interpretation
-moderate,average,768,414,354,0,5.3906250000000000E-001,equal_weight_fixed_grid_summary
-hard,average,768,370,398,0,4.8177083333333331E-001,equal_weight_fixed_grid_summary
-both,average,1536,784,752,0,5.1041666666666663E-001,equal_weight_fixed_grid_summary
-moderate,peak,768,367,401,0,4.7786458333333331E-001,equal_weight_fixed_grid_summary
-hard,peak,768,319,449,0,4.1536458333333331E-001,equal_weight_fixed_grid_summary
-both,peak,1536,686,850,0,4.4661458333333331E-001,equal_weight_fixed_grid_summary
-both,both_paired,3072,1470,1602,0,4.7851562500000000E-001,paired_record_count_not_independent_trials
+quiet,average,768,407,361,0,5.2994791666666663E-001,equal_weight_fixed_grid_summary
+moderate,average,768,417,351,0,5.4296875000000000E-001,equal_weight_fixed_grid_summary
+disturbed,average,768,408,360,0,5.3125000000000000E-001,equal_weight_fixed_grid_summary
+all,average,2304,1232,1072,0,5.3472222222222221E-001,equal_weight_fixed_grid_summary
+quiet,peak,768,365,403,0,4.7526041666666669E-001,equal_weight_fixed_grid_summary
+moderate,peak,768,364,404,0,4.7395833333333331E-001,equal_weight_fixed_grid_summary
+disturbed,peak,768,359,409,0,4.6744791666666669E-001,equal_weight_fixed_grid_summary
+all,peak,2304,1088,1216,0,4.7222222222222221E-001,equal_weight_fixed_grid_summary
+all,both_paired,4608,2320,2288,0,5.0347222222222221E-001,paired_record_count_not_independent_trials

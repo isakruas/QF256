@@ -4,8 +4,8 @@ program test_core
   use numerics_mod, only: dp,PI,seed_rng,rng_normal
   use qra_soft_mod, only: qra_encode,qra_decode,qra_syndrome
   use mfsk_iq_mod, only: sc_config,sc_result,setup_sc,sc_tx,sc_rx,sc_peak_reference,mfsk_statistics, &
-    estimate_n0,blind_cfo_limit_hz,blind_hf_cfo_limit_hz
-  use v2metrics_mod, only: waveform_metrics
+    estimate_n0,blind_cfo_limit_hz
+  use waveform_metrics_mod, only: waveform_metrics
   implicit none
   type(sc_config) :: cfg
   type(sc_result) :: result
@@ -15,13 +15,12 @@ program test_core
   integer(int64) :: state
   real(dp) :: probability(0:255,60),xr,xi,phase,gain,cfo,energy,peak,avg,papr,bw,peak_reference,convergence
   real(dp) :: audio_peak,audio_gain,pcm_error,n0,guard_mean,bin_mean,energies(0:255,60),target_snr
-  real(dp),parameter :: blind_cfos(9)=[-750.0_dp,-748.046875_dp,-160.375_dp,-40.25_dp,0.0_dp, &
-    40.625_dp,160.25_dp,748.046875_dp,750.0_dp]
+  real(dp),parameter :: blind_cfos(9)=[-125.0_dp,-123.046875_dp,-100.375_dp,-40.25_dp,0.0_dp, &
+    40.625_dp,100.25_dp,123.046875_dp,125.0_dp]
   integer,parameter :: boundary_starts(4)=[3600,3600,8400,8400]
-  real(dp),parameter :: boundary_cfos(4)=[-750.0_dp,750.0_dp,-750.0_dp,750.0_dp]
-  real(dp),parameter :: hf_boundary_cfos(4)=[-125.0_dp,125.0_dp,-125.0_dp,125.0_dp]
+  real(dp),parameter :: boundary_cfos(4)=[-125.0_dp,125.0_dp,-125.0_dp,125.0_dp]
   real(real32), allocatable :: packed(:,:)
-  complex(dp), allocatable :: iq(:),capture(:),minimum_capture(:),noise(:),wide_noise(:),filtered_noise(:)
+  complex(dp), allocatable :: iq(:),capture(:),minimum_capture(:),noise(:),broadband_noise(:),filtered_noise(:)
   logical :: ok
   character(77) :: text
   character(44) :: header
@@ -30,8 +29,7 @@ program test_core
   if(rc/=0) error stop 'Cannot create test scratch directory'
   call setup_sc(5,10.0_dp,12000.0_dp,cfg)
   call check(cfg%n==116800.and.cfg%ns==1536,'frame sample and symbol lengths')
-  call check(blind_cfo_limit_hz==750.0_dp,'fixed blind CFO acquisition limit')
-  call check(blind_hf_cfo_limit_hz==125.0_dp,'fixed blind-HF CFO acquisition limit')
+  call check(blind_cfo_limit_hz==125.0_dp,'fixed blind CFO acquisition limit')
   call check(cfg%ndata==60.and.cfg%npilot==16.and.cfg%nsym==76,'data and pilot schedule')
   call check(abs(cfg%duration-9.733333333333333_dp)<1e-12_dp,'full filtered duration')
   call check(all(cfg%pilot_tone==[116,189,210,195,96,57,158,159,12,117,42,59,120,113,118,151]),'fixed public pilot tones')
@@ -163,46 +161,31 @@ program test_core
     call check(abs(result%cfo-cfo)<1.0e-12_dp,'exact CFO search corner is included')
     call check(result%evidence>=30.22075_dp,'exact search-corner frame passes public evidence gate')
   end do
-  ! The additive HF profile uses the same timing window and decoder but a
-  ! narrower frequency grid that fits a conventional 300..2700 Hz USB channel.
-  ! Both frequency endpoints are exact coarse-grid points: 250/3.90625=64.
-  do trial=1,size(boundary_starts)
-    call random_payload(payload);call sc_tx(payload,cfg,iq)
-    offset=boundary_starts(trial);cfo=hf_boundary_cfos(trial);phase=.31_dp*trial;minimum_capture=0
-    do i=1,size(iq)
-      minimum_capture(offset+i)=iq(i)*exp(cmplx(0.0_dp,phase+2*PI*cfo*(i-1)/cfg%fs,dp))
-    end do
-    call sc_rx(minimum_capture,cfg,'blind-hf',result)
-    call check(result%crc_ok.and.all(result%payload==payload),'blind-HF decode at exact timing/CFO search corner')
-    call check(result%start==offset,'blind-HF exact timing search corner is included')
-    call check(abs(result%cfo-cfo)<1.0e-12_dp,'blind-HF exact CFO search corner is included')
-    call check(result%evidence>=30.22075_dp,'blind-HF search-corner frame passes public evidence gate')
-  end do
-  ! A real receiver can preserve the modem tones while suppressing the old
+  ! A real receiver can preserve the modem tones while suppressing the
   ! out-of-band noise guards.  The decoder must then use its robust in-band
   ! estimate instead of turning the soft metric into a false hard decision.
   call random_payload(payload);call sc_tx(payload,cfg,iq)
-  offset=6000;cfo=137.25_dp;phase=.43_dp;capture=0
+  offset=6000;cfo=117.25_dp;phase=.43_dp;capture=0
   do i=1,size(iq)
     capture(offset+i)=iq(i)*exp(cmplx(0.0_dp,phase+2*PI*cfo*(i-1)/cfg%fs,dp))
   end do
   target_snr=-16.0_dp;n0=1.0_dp/(2500.0_dp*10.0_dp**(target_snr/10.0_dp))
-  allocate(wide_noise(size(capture)),filtered_noise(size(capture)));call seed_rng(551901)
-  do i=1,size(wide_noise)
-    wide_noise(i)=sqrt(cfg%fs*n0/2)*cmplx(rng_normal(),rng_normal(),dp)
+  allocate(broadband_noise(size(capture)),filtered_noise(size(capture)));call seed_rng(551901)
+  do i=1,size(broadband_noise)
+    broadband_noise(i)=sqrt(cfg%fs*n0/2)*cmplx(rng_normal(),rng_normal(),dp)
   end do
-  call lowpass_noise(wide_noise,cfg%fs,1500.0_dp,filtered_noise)
-  call check(estimate_n0(filtered_noise,cfg%fs)<.01_dp*n0,'band-limited channel suppresses legacy noise guards')
+  call lowpass_noise(broadband_noise,cfg%fs,1500.0_dp,filtered_noise)
+  call check(estimate_n0(filtered_noise,cfg%fs)<.01_dp*n0,'band-limited channel suppresses out-of-band noise guards')
   capture=capture+filtered_noise
   call sc_rx(capture,cfg,'blind',result)
   call check(result%crc_ok.and.all(result%payload==payload),'band-limited noisy receiver input decodes')
   call check(abs(result%cfo-cfo)<.5_dp,'band-limited input frequency estimate')
   call check(abs(result%noise_variance/(cfg%fs*n0)-1)<.25_dp,'in-band noise estimate tracks known density')
   call seed_rng(551977)
-  do i=1,size(wide_noise)
-    wide_noise(i)=sqrt(cfg%fs*n0/2)*cmplx(rng_normal(),rng_normal(),dp)
+  do i=1,size(broadband_noise)
+    broadband_noise(i)=sqrt(cfg%fs*n0/2)*cmplx(rng_normal(),rng_normal(),dp)
   end do
-  call lowpass_noise(wide_noise,cfg%fs,1500.0_dp,filtered_noise)
+  call lowpass_noise(broadband_noise,cfg%fs,1500.0_dp,filtered_noise)
   call sc_rx(filtered_noise,cfg,'blind',result)
   call check(.not.result%crc_ok,'band-limited noise alone is rejected')
   n0=.0004_dp; guard_mean=0; bin_mean=0

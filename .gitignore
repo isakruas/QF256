@@ -6,6 +6,7 @@
 /study/build/
 /examples/run/
 *.mod
+__pycache__/
 docs/report/*.aux
 docs/report/*.log
 docs/report/*.out

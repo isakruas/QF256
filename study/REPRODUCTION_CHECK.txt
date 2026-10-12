@@ -1,38 +1,12 @@
-Deterministic checks of the standalone reproduction harness
+QF256 deterministic indexed replay
 
-Compiler: GNU Fortran (Debian 14.2.0-19) 14.2.0.
-Build: make -f study/Makefile.reproduce
-Flags: -O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -Werror.
-Result: successful compilation, no warnings.
-
-One pre-existing signal row was regenerated:
-  study/build/reproduce signal 3 average 1 1 study/build/equivalence_signal.csv
-Source: S03A, first data row, identities in physical_sources.tsv.
-The following printed values match the existing row exactly:
-  payload source71_hex = 6D43660800125570AC
-  payload/channel/noise seeds = 21561341 / 22861547 / 24162203
-  all average/peak power, energy, PAPR, BW99, SNR and Eb/N0 fields
-  true start = 0.55114554326769016 s
-  estimated start = 0.58466666666666667 s
-  true CFO = -1.8125948931197229 Hz
-  estimated CFO = -0.50000000000000000 Hz
-  accepted = 0, correct_payload = 0, decoded_wrong = 0
-  iterations = 100
-  evidence = 19.366771930773986
-
-One pre-existing independent noise-check row was regenerated:
-  study/build/reproduce noise-check 1 study/build/equivalence_noise.csv
-The corresponding recorded values match exactly:
-  global index / point / trial = 1 / 1 / 1
-  actual noise seed = 20564448
-  reference SNR = -24 dB
-  raw CRC accepted = 0, accepted = 0
-  evidence = 19.192190882627450
-  true complex noise variance = 1205.7054871245982
-  estimated complex noise variance = 1206.7117221337321
-  estimated start = 0.31566666666666665 s, CFO = 0 Hz
-  iterations = 100, gate enabled = 1, gate = 22.644583913858970
-
-These two deterministic checks reproduce recorded outcomes using the supplied
-numerical implementation. Replaying these records does not add observations
-to the statistical sample.
+Both rows were regenerated from the campaign source and matched every retained field exactly.
+Signal: reproduce signal 2 average 3 1 NEW_SIGNAL.csv
+Noise: reproduce noise-check 1 NEW_NOISE.csv
+Compiler: GNU Fortran (Debian 14.2.0-19) 14.2.0
+Signal payload: 0118F1630E269C2AA2B3
+Signal correct/accepted: 1/1
+Signal evidence: 73.137855471337190
+Noise raw/accepted: 0/0
+Noise evidence: 17.244068637967473
+Fixed gate: 30.220758775848424

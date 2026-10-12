@@ -1,7 +1,8 @@
 ! SPDX-License-Identifier: GPL-3.0-or-later
 ! Complex-IQ AWGN and finite Gaussian-scatter HF channel simulation.
 !
-! The named HF conditions are the simulation settings used in this study.
+! The named HF conditions use ITU-R F.1487 Annex 3, sections 3.1--3.3,
+! mid-latitude quiet, moderate and disturbed delay/Doppler parameters.
 ! Two independently fading paths have ensemble mean
 ! powers 1/2 each; realizations are never power-normalized.
 ! B_D = 2*sigma_f [Hz]; rho(dt)=exp(-PI**2*B_D**2*dt**2/2).
@@ -43,11 +44,11 @@ contains
     case('quiet')
       delays_s=[0.0_dp,0.0005_dp]; powers=[0.5_dp,0.5_dp]; default_doppler=0.1_dp
     case('moderate')
-      delays_s=[0.0_dp,0.001_dp]; powers=[0.5_dp,0.5_dp]; default_doppler=1.0_dp
-    case('hard')
-      delays_s=[0.0_dp,0.002_dp]; powers=[0.5_dp,0.5_dp]; default_doppler=4.0_dp
+      delays_s=[0.0_dp,0.001_dp]; powers=[0.5_dp,0.5_dp]; default_doppler=0.5_dp
+    case('disturbed')
+      delays_s=[0.0_dp,0.002_dp]; powers=[0.5_dp,0.5_dp]; default_doppler=1.0_dp
     case default
-      error stop 'Unknown channel: use awgn, quiet, moderate, hard'
+      error stop 'Unknown channel: use awgn, quiet, moderate, disturbed'
     end select
   end subroutine channel_profile
 

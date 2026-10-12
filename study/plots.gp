@@ -34,6 +34,7 @@ do for [format=1:2] {
     set bars 0.55
     set style line 1 linecolor rgb "#165a86" linewidth (1.25*render_scale) pointtype 7 pointsize (0.6*render_scale)
     set style line 2 linecolor rgb "#ae4828" linewidth (1.25*render_scale) pointtype 5 pointsize (0.6*render_scale)
+    set style line 3 linecolor rgb "#407845" linewidth (1.25*render_scale) pointtype 9 pointsize (0.6*render_scale)
     set multiplot layout 1,2 margins 0.105,0.985,0.185,0.875 spacing 0.085,0
     do for [panel=1:2] {
         power = (panel == 1 ? "average" : "peak")
@@ -44,11 +45,14 @@ do for [format=1:2] {
             set format y ""
         }
         plot "study/cells.csv" using \
-            ((strcol(1) eq "moderate" && strcol(2) eq power) ? column(3) : 1/0):8:9:10 \
-            with yerrorlines linestyle 1 title "Moderate", \
+            ((strcol(1) eq "quiet" && strcol(2) eq power) ? column(3) : 1/0):8:9:10 \
+            with yerrorlines linestyle 1 title "Quiet", \
             "study/cells.csv" using \
-            ((strcol(1) eq "hard" && strcol(2) eq power) ? column(3) : 1/0):8:9:10 \
-            with yerrorlines linestyle 2 title "Hard"
+            ((strcol(1) eq "moderate" && strcol(2) eq power) ? column(3) : 1/0):8:9:10 \
+            with yerrorlines linestyle 2 title "Moderate", \
+            "study/cells.csv" using \
+            ((strcol(1) eq "disturbed" && strcol(2) eq power) ? column(3) : 1/0):8:9:10 \
+            with yerrorlines linestyle 3 title "Disturbed"
     }
     unset multiplot
     unset output
@@ -71,11 +75,11 @@ do for [format=1:2] {
     set format y "%.1f"
     unset key
     set ylabel "Empirical cumulative fraction"
-    set multiplot layout 1,2 margins 0.105,0.985,0.195,0.87 spacing 0.085,0
+    set multiplot layout 1,2 margins 0.105,0.945,0.195,0.87 spacing 0.085,0
     set title "(a) 99% energy bandwidth"
     set xlabel "Bandwidth (Hz)"
-    set xrange [1650:2010]
-    set xtics 1700,100,2000
+    set autoscale x
+    set xtics autofreq
     set format x "%.0f"
     plot "study/physical/bw99_cdf.csv" using 1:2 with steps \
         linecolor rgb "#165a86" linewidth (1.3*render_scale)
@@ -83,8 +87,8 @@ do for [format=1:2] {
     set format y ""
     set title "(b) Oversampled envelope PAPR"
     set xlabel "PAPR (dB)"
-    set xrange [0.710845:0.710958]
-    set xtics 0.71085,0.00005,0.71095
+    set autoscale x
+    set xtics 0.00004
     set format x "%.5f"
     plot "study/physical/papr_cdf.csv" using 1:2 with steps \
         linecolor rgb "#165a86" linewidth (1.3*render_scale)

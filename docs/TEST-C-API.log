@@ -1,2 +1,0 @@
-./bin/test_c_api
-PASS: C ABI layout, validation, SNR, known and blind roundtrips

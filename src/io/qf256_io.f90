@@ -7,7 +7,7 @@ module qf256_io_mod
   use iso_fortran_env,only:int8,int32,int64,real32
   use, intrinsic :: ieee_arithmetic,only:ieee_is_finite
   use numerics_mod,only:dp,PI
-  use v2metrics_mod,only:fft_forward
+  use waveform_metrics_mod,only:fft_forward
   implicit none
   private
   public :: write_iq,read_iq,write_wav,read_wav

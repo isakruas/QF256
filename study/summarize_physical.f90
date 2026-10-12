@@ -4,20 +4,23 @@ program summarize_physical
   use, intrinsic :: iso_fortran_env, only: real64
   use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
   implicit none
-  integer, parameter :: dp=real64, count=1536
+  integer, parameter :: dp=real64, count=2304
   real(dp), parameter :: snrs(6)=[-24.0_dp,-22.0_dp,-20.0_dp,-18.0_dp,-16.0_dp,-14.0_dp]
-  real(dp) :: values(10,count,2), record(10), snr, ordered(count), fraction
+  real(dp) :: values(9,count,2), record(9), snr, ordered(count), fraction
   logical :: seen(count,2)
   character(4096) :: line
-  character(18) :: source, sources(count,2)
+  character(4096) :: directory
+  character(20) :: source, sources(count,2)
   character(12) :: constraint
   character(12), parameter :: constraints(2)=[character(12)::'average','peak']
   integer :: input, output, ios, channel_id, trial, point, power, row, rows, pseed, cseed, nseed
   integer :: condition, k, metric
   character(5), parameter :: metrics(2)=[character(5)::'bw99','papr']
   integer, parameter :: columns(2)=[5,4]
+  directory='study'
+  if(command_argument_count()>0)call get_command_argument(1,directory)
   seen=.false.; rows=0
-  open(newunit=input,file='study/physical/confirmation_physical.csv',status='old',action='read')
+  open(newunit=input,file=trim(directory)//'/physical/confirmation_physical.csv',status='old',action='read')
   read(input,'(A)',iostat=ios) line
   if(ios/=0.or.index(line,'channel_id,constraint,snr_db,trial,')/=1) error stop 'Unexpected physical header'
   do
@@ -26,7 +29,7 @@ program summarize_physical
     if(ios/=0) error stop 'Cannot read physical row'
     read(line,*,iostat=ios) channel_id,constraint,snr,trial,pseed,cseed,nseed,source,record
     if(ios/=0) error stop 'Malformed physical row'
-    if(channel_id/=3.and.channel_id/=4) error stop 'Unexpected channel'
+    if(channel_id<2.or.channel_id>4) error stop 'Unexpected channel'
     if(trial<1.or.trial>128) error stop 'Unexpected trial'
     point=0
     do k=1,6
@@ -39,10 +42,10 @@ program summarize_physical
     end do
     if(power==0) error stop 'Unexpected power constraint'
     condition=(channel_id-1)*6+point
-    if(pseed/=20261201+condition*100003+trial*101) error stop 'Unexpected payload seed'
-    if(cseed/=20261201+condition*200003+trial*307) error stop 'Unexpected channel seed'
-    if(nseed/=20261201+condition*300007+trial*911) error stop 'Unexpected noise seed'
-    row=(channel_id-3)*768+(point-1)*128+trial
+    if(pseed/=20271011+condition*100003+trial*101) error stop 'Unexpected payload seed'
+    if(cseed/=120271011+condition*200003+trial*307) error stop 'Unexpected channel seed'
+    if(nseed/=220271011+condition*300007+trial*911) error stop 'Unexpected noise seed'
+    row=(channel_id-2)*768+(point-1)*128+trial
     if(seen(row,power)) error stop 'Duplicate physical key'
     if(any(.not.ieee_is_finite(record))) error stop 'Nonfinite physical value'
     if(any(record(1:3)<=0.0_dp)) error stop 'Nonpositive power or energy'
@@ -52,12 +55,12 @@ program summarize_physical
   if(rows/=2*count.or..not.all(seen)) error stop 'Incomplete physical table'
   if(any(sources(:,1)/=sources(:,2))) error stop 'Power constraints have different source cases'
   if(maxval(abs(values(4:5,:,1)-values(4:5,:,2)))>1e-10_dp) error stop 'Power constraint changed PAPR or bandwidth'
-  if(maxval(abs(values(9:10,:,1)-values(9:10,:,2)))>1e-10_dp) error stop 'Power constraint changed start or CFO'
+  if(maxval(abs(values(8:9,:,1)-values(8:9,:,2)))>1e-10_dp) error stop 'Power constraint changed start or CFO'
   if(maxval(abs(values(1,:,1)-1.0_dp))>1e-8_dp) error stop 'Average constraint is not normalized'
   if(maxval(abs(values(2,:,2)-1.0_dp))>1e-10_dp) error stop 'Peak constraint is not normalized'
   if(maxval(abs(values(1,:,2)-values(1,:,1)/values(2,:,1)))>1e-10_dp) error stop 'Peak average-power scaling mismatch'
   if(maxval(abs(values(3,:,2)-values(3,:,1)/values(2,:,1)))>1e-10_dp) error stop 'Peak energy scaling mismatch'
-  open(newunit=output,file='study/physical/summary.csv',status='replace',action='write')
+  open(newunit=output,file=trim(directory)//'/physical/summary.csv',status='replace',action='write')
   write(output,'(A)') 'constraint,trials,min_bw99_hz,mean_bw99_hz,max_bw99_hz,min_papr_db,mean_papr_db,max_papr_db,'// &
     'min_average_power,mean_average_power,max_average_power,min_energy,mean_energy,max_energy,'// &
     'min_peak_power,mean_peak_power,max_peak_power'
@@ -72,7 +75,7 @@ program summarize_physical
   close(output)
   do metric=1,2
     ordered=values(columns(metric),:,1); call sort_values(ordered)
-    open(newunit=output,file='study/physical/'//trim(metrics(metric))//'_cdf.csv',status='replace',action='write')
+    open(newunit=output,file=trim(directory)//'/physical/'//trim(metrics(metric))//'_cdf.csv',status='replace',action='write')
     write(output,'(A)') 'value,proportion'
     do row=1,count
       fraction=real(row,dp)/count
@@ -80,7 +83,7 @@ program summarize_physical
     end do
     close(output)
   end do
-  print '(A)', 'Validated 3072 rows; summarized 1536 unique source cases across both power constraints.'
+  print '(A)', 'Validated 4608 rows; summarized 2304 unique source cases across both power constraints.'
 contains
   subroutine sort_values(array)
     real(dp), intent(inout) :: array(:)

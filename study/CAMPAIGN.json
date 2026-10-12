@@ -1,0 +1,206 @@
+{
+  "started_utc": "2026-10-12T00:25:23.733983+00:00",
+  "identity": {
+    "sources_sha256": {
+      "src/core/numerics.f90": "19b3121a72fefae738d84b8c28e36e1eacff3b02dc82bea9cef36cde9b1029c6",
+      "src/core/waveform_metrics.f90": "5167f4ad01faddac04622d40589111d2f315723af2505ff327237029be963821",
+      "src/core/qra_soft.f90": "9dc334170e4fd82fb999289d63e7961d1668ca2df8b1b86847b46efbc8236f58",
+      "src/core/mfsk_iq.f90": "20b05303b0f66900adcc06db07691a5e2b053e0a165ca899b1c8b20e069850b7",
+      "src/qf256_api.f90": "8503e2c8db91826ed73dff2c90ae9242d8e00164e679a8b73c59c43a30725a78",
+      "study/channel.f90": "cde313f282b8d04edcc25b402c0ca02f186a57897b462ad30bbe525423bb3af4",
+      "study/frontend.f90": "85e4578b89fe471a9ce954866df5538d5cc0f8333d8a2325e6f6f016efb4c1bd",
+      "study/reproduce.f90": "da01a6816775ea6a4db9817ed2b21f72be6d678ee1a6eb2496c9bc75531c98f0",
+      "study/validate_snr.f90": "4513a2bda28fa36e20ab61eec036ba47da31d9b779866a8540d9e9a87b4bdeb5",
+      "study/analyze.f90": "6e9cb2ab63cd33aa1469d6c9c387cdfc6f4341834212c2e97e2f89bb7268c83d",
+      "study/summarize_physical.f90": "4bf0de0115249b91b4f8d8ec2cf003a6b9f913cb1d1800125adf111c0e3601d5",
+      "study/run_campaign.py": "4b62c5d62f5fcf455d49cf284acc838083c2830ccbcee8cc4ace7a98f05da9ee",
+      "Makefile": "d25022da50ac2d8a3ef9c6fc5a1020112915b60b58c57582912ef345cff7a91a"
+    },
+    "compiler": {
+      "path": "/usr/bin/x86_64-linux-gnu-gfortran-14",
+      "sha256": "4e3c7636984f745a332049d2f66a80e3709fd8dfc50d2f538be78e71aabbe96d",
+      "version": "GNU Fortran (Debian 14.2.0-19) 14.2.0"
+    },
+    "compiler_flags": "-O3 -std=f2008 -ffree-line-length-none -Wall -Wextra -Werror",
+    "build_commands": {
+      "reproduce": [
+        "/usr/bin/x86_64-linux-gnu-gfortran-14",
+        "-O3",
+        "-std=f2008",
+        "-ffree-line-length-none",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-J/home/admin/QF256/study/build/reproduce-mod",
+        "-I/home/admin/QF256/study/build/reproduce-mod",
+        "src/core/numerics.f90",
+        "src/core/waveform_metrics.f90",
+        "src/core/qra_soft.f90",
+        "src/core/mfsk_iq.f90",
+        "src/qf256_api.f90",
+        "study/channel.f90",
+        "study/frontend.f90",
+        "study/reproduce.f90",
+        "-o",
+        "/home/admin/QF256/study/build/reproduce"
+      ],
+      "validate_snr": [
+        "/usr/bin/x86_64-linux-gnu-gfortran-14",
+        "-O3",
+        "-std=f2008",
+        "-ffree-line-length-none",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-J/home/admin/QF256/study/build/validate_snr-mod",
+        "-I/home/admin/QF256/study/build/validate_snr-mod",
+        "src/core/numerics.f90",
+        "src/core/waveform_metrics.f90",
+        "src/core/qra_soft.f90",
+        "src/core/mfsk_iq.f90",
+        "src/qf256_api.f90",
+        "study/channel.f90",
+        "study/frontend.f90",
+        "study/validate_snr.f90",
+        "-o",
+        "/home/admin/QF256/study/build/validate_snr"
+      ],
+      "analyze": [
+        "/usr/bin/x86_64-linux-gnu-gfortran-14",
+        "-O3",
+        "-std=f2008",
+        "-ffree-line-length-none",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fcheck=all",
+        "-J/home/admin/QF256/study/build/analyze-mod",
+        "-I/home/admin/QF256/study/build/analyze-mod",
+        "study/analyze.f90",
+        "-o",
+        "/home/admin/QF256/study/build/analyze"
+      ],
+      "summarize_physical": [
+        "/usr/bin/x86_64-linux-gnu-gfortran-14",
+        "-O3",
+        "-std=f2008",
+        "-ffree-line-length-none",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fcheck=all",
+        "-J/home/admin/QF256/study/build/summarize_physical-mod",
+        "-I/home/admin/QF256/study/build/summarize_physical-mod",
+        "study/summarize_physical.f90",
+        "-o",
+        "/home/admin/QF256/study/build/summarize_physical"
+      ]
+    },
+    "executables_sha256": {
+      "study/build/reproduce": "d0386f8784384b85f36bbeeae2afa8fc9a9f82fec7c3c6faf57a7084be1fe4fa",
+      "study/build/validate_snr": "5b94413059814567ea782d3028d86ec50d08be35d39abe872cc5218ef1b8a15b",
+      "study/build/analyze": "c6260edeae508bc1bde4edf006d5f3ba877dff7c2ab711429ea99e4f02243028",
+      "study/build/summarize_physical": "a7d82bd8cfe999c4cde690de5411a9a40952e758c866fb227946b3b51eeac2fc"
+    }
+  },
+  "design": {
+    "receiver": "blind",
+    "cfo_search_hz": [
+      -125,
+      125
+    ],
+    "gate": 30.220758775848424,
+    "gate_selection": "fixed project constant; no retuning",
+    "signal_records": 4608,
+    "paired_cases": 2304,
+    "payload_bits": 77,
+    "payload_distribution": "uniform all input bits",
+    "snr_reference_hz": 2500,
+    "snr_grid_db": [
+      -24,
+      -22,
+      -20,
+      -18,
+      -16,
+      -14
+    ],
+    "trials_per_cell": 128,
+    "constraints": [
+      "average",
+      "peak"
+    ],
+    "channel_parameters_reference": "ITU-R F.1487 Annex 3 sections 3.1--3.3, mid-latitude",
+    "channel_model": "two independent equal-ensemble-power Gaussian-scatter paths, 64 tones each",
+    "channels": {
+      "quiet": {
+        "id": 2,
+        "delays_ms": [
+          0,
+          0.5
+        ],
+        "doppler_width_hz": 0.1
+      },
+      "moderate": {
+        "id": 3,
+        "delays_ms": [
+          0,
+          1
+        ],
+        "doppler_width_hz": 0.5
+      },
+      "disturbed": {
+        "id": 4,
+        "delays_ms": [
+          0,
+          2
+        ],
+        "doppler_width_hz": 1
+      }
+    },
+    "frontend": "ideal USB 300..2700 Hz about centre 1500; padded continuous noise context",
+    "signal_cfo_hz": [
+      -2,
+      2
+    ],
+    "signal_start_s": [
+      0.4,
+      0.6
+    ],
+    "capture_samples": 180000,
+    "payload_seed_base": 20271011,
+    "channel_seed_base": 120271011,
+    "signal_noise_seed_base": 220271011,
+    "signal_noise_seed_offset": 29,
+    "seed_condition": "(channel_id-1)*6+point",
+    "noise_diagnostic_seed_base": 40271011,
+    "noise_check_seed_base": 60271011,
+    "diagnostic_captures": 2048,
+    "independent_check_captures": 4096,
+    "snr_validation_rows": 15,
+    "snr_validation_trials_per_row": 128,
+    "snr_awgn_seed_base": 70701011,
+    "snr_channel_seed_base": 80701011,
+    "snr_noise_seed_base": 90701011
+  },
+  "workers": 8,
+  "git_head_before_run": "746f43c5442c81a4f2d1345c2d50f8f2d1818aec",
+  "completed_utc": "2026-10-12T00:35:06.961617+00:00",
+  "wall_seconds": 583.2264547550003,
+  "outputs_sha256": {
+    "study/confirmation.csv": "048ccb2f5322bc864ac1824711a9cc14f7dc42f7f94af62b41301fd482957f4e",
+    "study/noise.csv": "cf0d9f10846d29f72c86b9fd17458512d3d8155db234416f77b8809e7bb03d35",
+    "study/SNR_VALIDATION.csv": "cfa5492a8d21715f90e8c16240f68d5150bd556edc6c19b13dea42b91e2e29ae",
+    "study/DATA_SOURCES.csv": "a16f8c1d503fb469751c02f6f1fa88c7162d981e48d7226e1b14987839643e0e",
+    "study/physical/confirmation_physical.csv": "de11488729125ee876ef2cf29f830afb9ee375c710af7894bf9acfb7d66568c0",
+    "study/physical/summary.csv": "83ff91e97d43b213008e50cf123a69c95c3ee423d83c3bac249987a43cbbda0a",
+    "study/physical/bw99_cdf.csv": "c1582b15da4e59864ae2ce9080a372c584eb63fa573c6cef126c9398b1fb8f87",
+    "study/physical/papr_cdf.csv": "7a128352fca1ab494775821daf2551afaf5091dfd1aba511fa9f1b1d51574c73",
+    "study/RESULTS.txt": "58400a19d8cd0a9e08487dff7e1898373a85b186a5591c91a0e63b9b6c5cf9dd",
+    "study/cells.csv": "32c766115e0632c915233c321022ffad6c1cdeaf43ad9a0e7ff6a0c581262f36",
+    "study/aggregate.csv": "9a75a4e979d4b60bced3fb219433dff4cdbd0cbcc6928252f610173b2043350f",
+    "study/thresholds.csv": "c12b5d6a701a441704e16e0f9042b1d633466dc4d331fc59be58d31881820bad",
+    "study/noise_summary.csv": "bec6bd0c11c96eaf0aa3d205b8d1809ed73a8ff6bc149d6384e94bb814df75f0",
+    "study/publication-cells.tex": "b3d160757944c73c01420d95935e11b1b7d7f133c6806774e683a5a254f98475",
+    "study/publication-thresholds.tex": "e4355d4777cf3dca09d97225e26d0f3e6f7899859d0c86a15541056062296fcd"
+  }
+}

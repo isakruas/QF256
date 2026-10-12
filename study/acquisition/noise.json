@@ -1,0 +1,32 @@
+{
+  "completed_utc": "2026-10-12T00:18:14.534984+00:00",
+  "wall_seconds": 79.78419852256775,
+  "receiver": "blind",
+  "cfo_limit_hz": 125.0,
+  "numpy_version": "2.2.4",
+  "arguments": {
+    "command": "noise",
+    "lib": "lib/libqf256.so",
+    "seed_base": 9106101100,
+    "cutoff": 1200.0,
+    "frontend_offset": [
+      -25.0,
+      25.0
+    ],
+    "workers": 8,
+    "chunk": 32,
+    "output": "study/acquisition/noise.csv",
+    "replace": true,
+    "count": 4096
+  },
+  "source_sha256": {
+    "src/core/numerics.f90": "19b3121a72fefae738d84b8c28e36e1eacff3b02dc82bea9cef36cde9b1029c6",
+    "src/core/waveform_metrics.f90": "5167f4ad01faddac04622d40589111d2f315723af2505ff327237029be963821",
+    "src/core/qra_soft.f90": "9dc334170e4fd82fb999289d63e7961d1668ca2df8b1b86847b46efbc8236f58",
+    "src/core/mfsk_iq.f90": "20b05303b0f66900adcc06db07691a5e2b053e0a165ca899b1c8b20e069850b7",
+    "src/qf256_api.f90": "8503e2c8db91826ed73dff2c90ae9242d8e00164e679a8b73c59c43a30725a78",
+    "study/validate_acquisition.py": "840a422f9fe30579e10f58b0802077ce68d221d71981e8d1a1fbc4825dec9545"
+  },
+  "library_sha256": "1318adfc5798539f6f9e8fbc8ce22ec8464be7e45c39d87c7e78a4f104b08795",
+  "output_sha256": "cac830f998091fad98bfe094cef71205e6d4f0e05c1c634c77d0d947cbe58b0a"
+}

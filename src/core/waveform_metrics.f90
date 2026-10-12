@@ -1,5 +1,5 @@
 ! Physical metrics for complex IQ in Fortran 2008.
-module v2metrics_mod
+module waveform_metrics_mod
   use iso_fortran_env, only: real64,int64
   use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
   implicit none
@@ -143,4 +143,4 @@ contains
     end do
     f=(real(n/2,dp)-0.5_dp)*df
   end function power_quantile
-end module v2metrics_mod
+end module waveform_metrics_mod

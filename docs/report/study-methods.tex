@@ -3,16 +3,17 @@
 
 \subsection{Channel and observation model}
 
-The study uses two Gaussian-scatter tapped-delay profiles in the spirit of
-stationary HF channel modeling \cite{watterson}. Their exact implementation
-is defined here, rather than identified with a standardized profile. Let
+The study uses the quiet, moderate and disturbed mid-latitude profiles
+specified by Recommendation ITU-R F.1487-0, Annex~3, Sections~3.1--3.3
+\cite{itu1487}, with Gaussian-scatter tapped-delay fading
+\cite{watterson}. Their finite spectral implementation is defined here. Let
 $x[n]$ be the normalized transmit frame, extended by zero outside its
 support, and let $A$ apply the chosen transmit-power constraint. With
-$t=(n-s)/f_s$, the received capture is
+$t=(n-s)/f_s$, the observation before frontend filtering is
 \begin{equation}
- y[n]=A e^{\mathrm j2\pi\nu t}
+ r[n]=A e^{\mathrm j2\pi\nu t}
        \sum_{\ell=1}^{2}\sqrt{P_\ell}\,g_\ell(t)
-          x[n-s-d_\ell]+w[n],\qquad 0\le n<180000.
+          x[n-s-d_\ell]+w[n].
  \label{eq:channel}
 \end{equation}
 Here $s$ is an integer start offset, $\nu$ is constant CFO, and the path
@@ -28,6 +29,11 @@ $\E|g_\ell|^2=1$ and correlation
 $R_g(\tau)=\exp(-\pi^2 B_D^2\tau^2/2)$.
 A realization contains 64 spectral lines; it approximates the continuous
 Gaussian spectrum. Individual fades are not power-normalized.
+Here the Doppler spread $B_D$ is twice the Gaussian spectrum's standard
+deviation, as in the recommendation, not its full width at half maximum.
+Each path's mean Doppler is zero, as specified in Annex~3.
+The common $\nu\in[-2,2)\Hz$ is an additional tuning offset for this
+receiver experiment, not Doppler spread or a parameter of the ITU profile.
 
 \begin{table}[ht]
 \centering
@@ -35,11 +41,13 @@ Gaussian spectrum. Individual fades are not power-normalized.
 \toprule
 Profile & Delays & Path powers & $B_D=2\sigma_F$ \\
 \midrule
-Moderate & 0, 1\,ms (0, 12 samples) & $1/2,1/2$ & 1\,Hz \\
-Hard & 0, 2\,ms (0, 24 samples) & $1/2,1/2$ & 4\,Hz \\
+Quiet & 0, 0.5\,ms (0, 6 samples) & $1/2,1/2$ & 0.1\,Hz \\
+Moderate & 0, 1\,ms (0, 12 samples) & $1/2,1/2$ & 0.5\,Hz \\
+Disturbed & 0, 2\,ms (0, 24 samples) & $1/2,1/2$ & 1\,Hz \\
 \bottomrule
 \end{tabular}
-\caption{The two simulated HF profiles at $f_s=12$\,kHz.}
+\caption{The three ITU-R F.1487-0 mid-latitude profiles at $f_s=12$\,kHz.
+Both independently fading paths have equal ensemble power.}
 \label{tab:channel}
 \end{table}
 
@@ -49,16 +57,30 @@ The start is drawn uniformly from $[0.4,0.6)$\,s and rounded to the nearest
 sample; CFO is uniform over $[-2,2)$\,Hz. There is no frequency drift.
 The receiver receives only the capture and fixed public configuration;
 it searches the larger region specified in Section~\ref{sec:rx}.
+Each cell measures frame acceptance over 128 frames.
 
-Noise is independently generated for all 180,000 capture samples, including
-samples outside the burst. For a reference level $\rho$ in dB,
+The receiver input is $y=\mathcal H r$, where $\mathcal H$ is an ideal
+FFT-domain mask retaining $|f|\le1200\Hz$. This models a 300--2700\,Hz
+USB audio channel translated about 1500\,Hz. The mask acts on signal and
+noise together. For each 180,000-sample observation, the simulator generates
+a 524,288-sample context, places the delayed signal in its central observation window, filters
+the complete context, and retains the central observation. Noise extends
+beyond both observation boundaries; each boundary is 172,144 samples from
+the periodic FFT seam. The model excludes physical filter ripple and
+transition bands. It preserves finite-context FFT behavior rather than
+asserting an exact infinite-duration brick-wall realization.
+
+Independent Gaussian noise is generated throughout that context before
+filtering, including samples outside the burst. For a reference level $\rho$ in dB,
 \begin{equation}
  N_0=\frac{1}{2500\,10^{\rho/10}},\qquad
  w[n]\sim\mathcal{CN}(0,f_sN_0).
  \label{eq:snrref}
 \end{equation}
-Each real quadrature has variance $f_sN_0/2$. Noise is not rescaled by the
-instantaneous faded receive power or by the waveform bandwidth.
+Each prefilter real quadrature has variance $f_sN_0/2$. Band limitation
+correlates received samples and reduces their total variance; the spectral
+density in the retained passband remains the reference $N_0$. Noise is not
+rescaled by the instantaneous faded receive power or by waveform bandwidth.
 
 \subsection{Transmit power, energy, and waveform measurements}
 
@@ -82,11 +104,10 @@ in \eqref{eq:snrref}. Actual average transmit SNR and source-bit energy are
  (E_b/N_0)_{77}=\rho+10\log_{10}(2500E/77).
  \label{eq:physicalsnr}
 \end{equation}
-The first equals $\rho$ only under unit-average normalization. In the
-unit-peak setting it is approximately $\rho-0.711\dB$. These quantities
+The first equals $\rho$ only under unit-average normalization. These quantities
 refer to transmit power and ensemble channel normalization, not to the
-power of a particular faded receive frame. Dividing by 77 counts supplied
-payload bits; the sampled payload entropy is 71 bits as described below.
+power of a particular faded receive frame or the power remaining after
+frontend filtering. Dividing by 77 counts the uniformly sampled message bits.
 
 Bandwidth is measured on the complete active waveform before the channel.
 An unwindowed FFT is zero-padded to the next power of two at least $4N_f$
@@ -104,21 +125,23 @@ Both width and PAPR are invariant under the subsequent constant peak scaling.
 For each profile, the reference levels are
 $\{-24,-22,-20,-18,-16,-14\}\dB$, with 128 separately seeded frames in every
 cell. The two power settings reuse the payload, fading, noise, start, and
-CFO draws: there are 1536 underlying randomized cases and 3072 outcome
-records, not 3072 independent realizations. Outcomes within a cell use
+CFO draws: there are 2304 underlying randomized cases and 4608 outcome
+records across 36 cells, not 4608 independent realizations. Outcomes within a cell use
 different payload, channel, and noise seeds. The analysis makes no
 independence assumption between power settings.
 
-The message generator draws 71 random bits and appends the fixed suffix
-\texttt{101000}. It consumes 18 uniform draws to form the random part;
-the next two draws set start and CFO. Thus the error-rate experiment samples
-a defined subset of the encoder's $2^{77}$ codebook. With profile index
-$q\in\{3,4\}$, SNR index $j\in\{1,\ldots,6\}$, trial
-$i\in\{1,\ldots,128\}$, $c=6(q-1)+j$, and $b=20261201$, the seeds are
+The message generator samples all 77 input bits: one uniform draw supplies
+one bit and nineteen further draws supply four bits each. The resulting
+20-digit hexadecimal representation includes the three leading padding
+bits required by the file interface, not fixed payload bits. The next two
+draws set start and CFO. With profile index
+$q\in\{2,3,4\}$ for quiet, moderate and disturbed, SNR index
+$j\in\{1,\ldots,6\}$, trial $i\in\{1,\ldots,128\}$, and
+$c=6(q-1)+j$, the seeds are
 \begin{align}
- s_p&=b+100003c+101i,\nonumber\\
- s_h&=b+200003c+307i,\nonumber\\
- s_w&=b+300007c+911i+29.
+ s_p&=20271011+100003c+101i,\nonumber\\
+ s_h&=120271011+200003c+307i,\nonumber\\
+ s_w&=220271011+300007c+911i+29.
  \label{eq:seeds}
 \end{align}
 The Fortran random generator is initialized separately for these streams;
@@ -126,19 +149,12 @@ Gaussian values use the documented Box--Muller transform. Bitwise replay
 therefore depends on the retained GNU Fortran runtime convention. The
 standalone harness implements the same initialization and draw order.
 
-The waveform, QRA graph, metric, iteration limit, acquisition bounds, sample
-counts, channel settings, and confirmation grid were fixed before the reported
-confirmation outcomes were inspected. Only the pilot-evidence threshold was calibrated,
-using a separate 2048-capture noise lot. Its type-7 empirical 99th percentile
-is
-\begin{equation}
- \eta_0=0.47\eta_{(2027)}+0.53\eta_{(2028)}=\Gate,
- \label{eq:calgate}
-\end{equation}
-where parentheses index the sorted calibration evidence values. The
-threshold and records were hashed before the independent noise check and
-confirmation analysis. It was not retuned using the reported outcomes
-\cite{study}.
+The receiver configuration, including $\eta_0=\Gate$, is a fixed design
+input to this campaign. The study does not derive or tune that threshold
+from its observed outcomes. A separate 2048-capture noise diagnostic lot
+describes evidence quantiles and raw/gated outcomes; its 99th percentile
+must not be substituted for the operating threshold. Source and per-trial
+records identify the exact implementation and configuration \cite{study}.
 
 \subsection{Endpoints and uncertainty}
 
@@ -157,7 +173,7 @@ The pointwise two-sided 95\% Wilson interval \cite{wilson} is
  \label{eq:wilson}
 \end{equation}
 These are cell intervals, not simultaneous confidence bands. The grid
-average weights all twelve profile/SNR cells equally and is reported as
+average weights all eighteen profile/SNR cells equally and is reported as
 a descriptive summary, without treating heterogeneous cells as one binomial
 population.
 
@@ -174,7 +190,11 @@ interval for the linear-interpolation model.
 The independent noise-only check uses 4096 fresh 15-second captures and
 retains the same blind receiver. Reference levels cycle through the six
 noise scales in \eqref{eq:snrref}; there is no received SNR without a signal.
-Calibration and check seeds are disjoint. For zero accepted messages, the
+Diagnostic and check seeds are disjoint. They use bases 40271011 and
+60271011, respectively. For global index $g$ starting at one, set
+$j=1+((g-1)\bmod6)$, $i=1+\lfloor(g-1)/6\rfloor$, and
+$s_w=b+300007j+911i+29$. Both lots use the same ideal frontend as the
+signal study. For zero accepted messages, the
 one-sided exact 95\% binomial upper bound is \cite{clopper}
 \begin{equation}
  p_U=1-0.05^{1/4096}=0.0007311125565.
@@ -183,6 +203,43 @@ one-sided exact 95\% binomial upper bound is \cite{clopper}
 It is exact under a common capture probability. If probabilities differ
 between noise scales, it is conservative for their allocation-weighted mean:
 for independent captures, $\prod_i(1-p_i)\le(1-\overline p)^{4096}$.
-Calibration samples are excluded from this denominator. The supplied provenance also
-records limited scalar-seed coincidences with signal-payload seeds; the
-study does not assume complete mutual stream independence across all lots.
+Diagnostic samples are excluded from this denominator. Separate indexed
+seed ranges do not prove the statistical independence of a pseudorandom
+generator; the model treats the separately initialized streams as independent.
+The deliberately paired power settings are not independent trials.
+
+\subsection{Acquisition geometry and estimator checks}
+
+A separate AWGN experiment exercises the full acquisition limits through
+the same nominal audio passband. With audio centers 1475 and 1525\,Hz,
+the ideal complex masks are $[-1175,1225]\Hz$ and
+$[-1225,1175]\Hz$. Combining these centers with CFO limits $\pm125\Hz$
+places the most extreme tone centers at 353.90625 and 2646.09375\,Hz,
+53.90625\,Hz inside the corresponding audio edge. This is a tone-center
+geometry statement, not a guarantee that all waveform energy is inside
+the passband or that a practical filter has adequate edge gain.
+
+The signal check uses 128 payload/noise cases at each of $-20$, $-18$,
+and $-4\dB$, with 125,200-sample observations. The first eight cases at
+each level cover every Cartesian combination of start 3600/8400 samples,
+CFO $-125/+125\Hz$, and frontend center 1475/1525\,Hz. Other starts are
+uniform integers in the same bounds, CFO is uniform over the frequency
+interval, phase is uniform on $[-\pi,\pi)$, and frontend centers alternate.
+An independently seeded 4096-capture noise lot alternates those two masks.
+These trials measure boundary acquisition separately from the main fading
+study's $\pm2\Hz$ CFO distribution; the two sets are not pooled. They call
+the public float32 C interface in separate processes. Signal filtering uses
+a 262,144-sample context and retains its central 125,200 samples. Per-case
+seeds, numerical-library versions, and source identities accompany the
+acquisition records \cite{study}.
+
+The estimator check uses one deterministic 77-bit payload and 128 cases
+per point. In AWGN it measures known aligned transmitted tones at six
+levels from $-24$ through $-14\dB$, using the receiver's selected noise
+estimate. Fading cases use automatic acquisition, a start of 0.5\,s,
+CFO 3.2\,Hz, and levels $-18$, $-16$, and $-14\dB$. Their SNR errors
+are recorded only for correct accepted messages with valid estimates.
+The six AWGN rows and three rows for each fading profile give 15 rows
+and 1920 attempted estimates, separately from the main signal grid.
+Both use the centered ideal frontend. Thus AWGN and fading estimator
+rows have different conditioning and are not direct sensitivity comparisons.

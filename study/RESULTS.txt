@@ -1,23 +1,29 @@
 QF256 completed-record analysis
-3072 signal records: 1536 source/channel/noise cases paired across two power constraints.
-24 channel/power/SNR cells, 128 records each; SNR grid -24,-22,-20,-18,-16,-14 dB.
+4608 signal records: 2304 source/channel/noise cases paired across two power constraints.
+36 channel/power/SNR cells, 128 records each; SNR grid -24,-22,-20,-18,-16,-14 dB.
 Correct accepted means all source bits recovered and operational acceptance passed.
 Missed means no accepted message; accepted wrong is reported separately.
-moderate average 414/768 correct; missed=354; accepted wrong=0
-hard average 370/768 correct; missed=398; accepted wrong=0
-both average 784/1536 correct; missed=752; accepted wrong=0
-moderate peak 367/768 correct; missed=401; accepted wrong=0
-hard peak 319/768 correct; missed=449; accepted wrong=0
-both peak 686/1536 correct; missed=850; accepted wrong=0
-moderate average interpolated 50%= -19.39726 dB; simultaneous 95% grid bracket [-20,-18] dB
-hard average interpolated 50%= -18.82500 dB; simultaneous 95% grid bracket [-20,-18] dB
-moderate peak interpolated 50%= -18.80519 dB; simultaneous 95% grid bracket [-20,-18] dB
-hard peak interpolated 50%= -17.87302 dB; simultaneous 95% grid bracket [-20,-16] dB
-Recomputed calibration type7 99th-percentile gate:   2.2644583913858973E+01
-calibration: captures=2048; raw FEC=0; gated events=0; evidence exceedances=21
-independent: captures=4096; raw FEC=0; gated events=0; evidence exceedances=44
+quiet average 407/768 correct; missed=361; accepted wrong=0
+moderate average 417/768 correct; missed=351; accepted wrong=0
+disturbed average 408/768 correct; missed=360; accepted wrong=0
+all average 1232/2304 correct; missed=1072; accepted wrong=0
+quiet peak 365/768 correct; missed=403; accepted wrong=0
+moderate peak 364/768 correct; missed=404; accepted wrong=0
+disturbed peak 359/768 correct; missed=409; accepted wrong=0
+all peak 1088/2304 correct; missed=1216; accepted wrong=0
+quiet average interpolated 50%= -19.28571 dB; simultaneous 95% grid bracket [-22,-18] dB
+moderate average interpolated 50%= -19.47541 dB; simultaneous 95% grid bracket [-20,-18] dB
+disturbed average interpolated 50%= -19.28205 dB; simultaneous 95% grid bracket [-20,-18] dB
+quiet peak interpolated 50%= -18.71111 dB; simultaneous 95% grid bracket [-20,-18] dB
+moderate peak interpolated 50%= -18.74194 dB; simultaneous 95% grid bracket [-20,-18] dB
+disturbed peak interpolated 50%= -18.73418 dB; simultaneous 95% grid bracket [-20,-18] dB
+Fixed project acceptance gate (not fitted in this campaign):   3.0220758775848424E+01
+Diagnostic evidence type7 99th percentile (not a replacement gate):   2.6495057061834487E+01
+diagnostic: captures=2048; raw FEC=0; gated events=0; evidence exceedances=3
+independent: captures=4096; raw FEC=0; gated events=0; evidence exceedances=4
 Independent one-sided exact 95% upper per 15-second capture:   7.3111255647539952E-04
-This total bound is exact for a common event probability and conservative for an allocation-weighted mean if noise-scale probabilities differ.
+This total bound assumes a common event probability.
+For zero events it is also conservative for an allocation-weighted mean if noise-scale probabilities differ.
 Zero raw FEC events means these records do not measure an observed reduction caused by the gate.
 Threshold point estimates interpolate the observed 2 dB grid; grid brackets assume a monotone true response.
 Each bracket uses six simultaneous exact binomial intervals (Bonferroni, 95% coverage per curve).

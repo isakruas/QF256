@@ -9,7 +9,9 @@ file conversion is handled separately.
 
 ## Fortran
 
-Use module `qf256_api`; real and imaginary components use `real64`:
+Use module `qf256_api`; real and imaginary components use `real64`.
+This example is an aligned-frame loopback test. Received capture windows
+use `blind` acquisition instead, with the bounds specified below.
 
 ```fortran
 use iso_fortran_env, only: real64
@@ -29,12 +31,11 @@ end if
 `qf256_encode(bits(:), iq, status, message)` accepts exactly 77 default-kind
 integers in `{0,1}` and allocates its `complex(real64)` output. On a validation
 error `iq` is unallocated. `qf256_decode(iq(:), sync, result, accepted, status,
-message)` accepts `known`, `blind`, or `blind-hf`. Both routines have an optional output
+message)` accepts `blind` or the diagnostic `known` setting. Both routines have an optional output
 character argument `message`; a short caller buffer truncates it normally.
 Constants exported by the module include `qf256_sample_rate`,
 `qf256_frame_samples`, `qf256_payload_bits`, `qf256_blind_min_samples`,
 `qf256_max_samples`, `qf256_gate`, `qf256_blind_cfo_limit_hz`,
-`qf256_blind_hf_cfo_limit_hz`,
 `qf256_snr_reference_hz`, synchronization values and status codes.
 
 `sc_result` is re-exported from the core. Its payload and `crc_ok` describe the
@@ -51,9 +52,8 @@ estimate defined below.
 
 | Mode | Minimum complex samples | Meaning |
 |---|---:|---|
-| `known` / `QF256_SYNC_KNOWN` | 116800 | Frame starts at offset zero; residual CFO is assumed zero. |
-| `blind` / `QF256_SYNC_BLIND` | 125200 | Search frame starts from 0.3 through 0.7 seconds and complex-baseband CFO from −750 through +750 Hz. |
-| `blind-hf` / `QF256_SYNC_BLIND_HF` | 125200 | Same timing search, with complex-baseband CFO from −125 through +125 Hz for a conventional USB channel. |
+| `blind` / `QF256_SYNC_BLIND` | 125200 | Automatic acquisition: search frame starts from 0.3 through 0.7 seconds and residual complex-baseband CFO from −125 through +125 Hz, inclusive. |
+| `known` / `QF256_SYNC_KNOWN` | 116800 | Diagnostic/aligned-input setting: frame starts at offset zero and residual CFO is zero; no acquisition search. |
 
 The maximum length is 180000 complex samples (15 seconds) in every mode.
 The blind minimum accommodates the whole filtered frame at the latest searched
@@ -79,9 +79,9 @@ void qf256_rx_cf32(const float *iq_interleaved, int32_t ncomplex,
                    int32_t sync_mode, qf256_result *result, int32_t *status);
 ```
 
-`QF256_SYNC_BLIND_HF == 2` is additive; the function signatures, API version 1,
-and 152-byte result layout are unchanged. Existing callers using
-`QF256_SYNC_BLIND == 1` retain the full ±750 Hz search.
+The API version is 1. `QF256_SYNC_BLIND == 1` selects automatic acquisition;
+`QF256_SYNC_KNOWN == 0` selects aligned-input decoding. Other values are
+invalid. The result layout occupies 152 bytes on the tested C ABI.
 
 IQ is float32 interleaved `[I0,Q0,I1,Q1,...]`. Counts are complex samples, passed
 by value. Allocate at least `2*capacity_complex` floats for TX and `2*ncomplex`
@@ -104,7 +104,7 @@ layout is defined by the header and interoperable Fortran `qf256_result_c`:
 | `start_samples`, `iterations` | `int32_t` each | Zero-based capture offset and FEC iterations. |
 | `start_seconds` | `double` | `start_samples / 12000`. |
 | `cfo_hz` | `double` | Estimated residual frequency offset. |
-| `noise_variance` | `double` | Selected complex sample noise-power estimate, `fs*N0`. |
+| `noise_variance` | `double` | Selected equivalent prefilter complex white-noise variance, `fs*N0`; not the total variance remaining after band limitation. |
 | `evidence` | `double` | Pilot energy / estimated `N0` minus 16. |
 | `latency_ms` | `double` | Core process CPU time, excluding adapter conversion/validation. |
 | `snr_2500_db` | `double` | Active-frame signal-to-noise estimate referenced to 2500 Hz. |
@@ -145,26 +145,24 @@ correct-bin energies \(E^{(1)}_{\hat t_j,j}\). It then evaluates
 10\log_{10}\!\left(\frac{\widehat P}{2500\widehat N_0}\right).
 \]
 
-Under aligned static AWGN, each correct-bin projection has expected energy
+Under aligned, unfiltered static AWGN with the true noise density, each correct-bin projection has expected energy
 \(P E^{(1)}_{\hat t_j,j}+N_0\); subtracting one noise contribution per data
 symbol therefore gives an unbiased signal-power estimate before the logarithm.
+The operational receiver estimates timing, frequency, payload, and noise;
+that selection and estimation can introduce bias, especially with filtering
+or fading. No claim of an unbiased reported SNR follows from this identity.
 `snr_valid` is one only when the CRC is valid and all terms produce a finite,
 positive power estimate. The estimate is separate from `evidence`, which is the
 pilot acquisition statistic and is not an SNR.
 
-The following fixed-seed results are retained from the v1.0 guard-only
-receiver and are historical rather than a validation of the current expanded
-acquisition. `study/validate_snr.f90` used 128 cases per point.
-Across AWGN levels −24 through −14 dB, bias ranged from −0.080 to −0.023 dB and
-RMSE from 0.892 to 0.234 dB. On CRC-valid decodes in the official moderate HF
-profile at −18/−16/−14 dB, the valid counts were 115/127/128, bias
-−0.166/−0.250/−0.226 dB, and RMSE 0.925/1.029/1.002 dB. In the hard profile the
-corresponding values were 104/128/128, −0.764/−0.963/−1.009 dB, and
-1.049/1.318/1.270 dB. Multipath and Doppler move signal energy out of the
-nominal decoded-tone projections, producing the observed negative bias; no
-empirical correction is applied. The receiver does not estimate SNDR or Doppler
-spread. In the Fortran result, `selected_bd == -1` denotes unavailable Doppler
-spread, and `used_osd` is false.
+The current fixed-seed estimator measurements are published in
+`study/SNR_VALIDATION.csv` and discussed in the technical report. The study
+specifies which rows use known transmitted tones and which are conditioned
+on correct CRC-valid receiver output. Those populations must not be treated
+as equivalent. Multipath and Doppler can move signal energy outside the
+nominal decoded-tone projections; no empirical bias correction is applied.
+The receiver does not estimate SNDR or Doppler spread. In the Fortran result,
+`selected_bd == -1` denotes unavailable Doppler spread, and `used_osd` is false.
 
 Calls are not thread-safe: the FFT implementation has a shared saved
 cache. Serialize all calls within a process, including other direct users of
@@ -199,13 +197,8 @@ WAV analytic conversion keeps the positive-frequency audio spectrum before
 translation, so it does not supply the same guards as full-band complex IQ.
 The fallback makes such filtered input decodable, but its selected noise, SNR,
 and evidence can still differ from the corresponding full-band IQ capture.
-The ±750 Hz acquisition interval of `blind` is an IQ contract. Because QF256 tones extend
-to ±996.09375 Hz, a real 0..6000 Hz WAV path needs a center approximately in
-the range 1746.09375..4253.90625 Hz for full ±750 Hz coverage, plus a frontend
-passband that actually retains those frequencies. The 1500 Hz default covers
-the nominal zero-CFO waveform but not the complete negative-CFO limit.
-
-`blind-hf` is the bounded real-audio profile. With a physical USB passband of
+The `blind` interval is residual CFO relative to the selected audio center,
+not an RF tuning range. With a physical USB passband of
 300–2,700 Hz, an audio centre from 1,475 through 1,525 Hz, and residual CFO no
 larger than ±125 Hz, the outer tone centres occupy 353.90625–2,646.09375 Hz.
 That leaves 53.90625 Hz to each limiting passband edge in the worst Cartesian

@@ -15,13 +15,11 @@ enum {
     QF256_BLIND_MIN_SAMPLES = 125200,
     QF256_MAX_SAMPLES = 180000,
     QF256_SYNC_KNOWN = 0,
-    QF256_SYNC_BLIND = 1,
-    QF256_SYNC_BLIND_HF = 2
+    QF256_SYNC_BLIND = 1
 };
 #define QF256_GATE 30.220758775848424
 #define QF256_SNR_REFERENCE_HZ 2500.0
-#define QF256_BLIND_CFO_LIMIT_HZ 750.0
-#define QF256_BLIND_HF_CFO_LIMIT_HZ 125.0
+#define QF256_BLIND_CFO_LIMIT_HZ 125.0
 
 enum qf256_status {
     QF256_OK = 0,
@@ -43,7 +41,7 @@ typedef struct qf256_result {
     int32_t iterations;
     double start_seconds;
     double cfo_hz;
-    double noise_variance;    /* Estimated E[|complex noise sample|^2]=fs*N0. */
+    double noise_variance;    /* Equivalent prefilter white-noise variance fs*N0. */
     double evidence;          /* Pilot energy / estimated N0 - 16; not a probability. */
     double latency_ms;        /* Core process CPU time; not end-to-end wall time. */
     double snr_2500_db;       /* Estimated active-frame SNR in 2500 Hz. */
